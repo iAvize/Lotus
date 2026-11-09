@@ -359,29 +359,8 @@ class MainWindow(QMainWindow):
         self.ask_input.setEnabled(False)
         self._append_chat("You", text)
 
-        lower = text.lower()
-        if self._pending_os_question:
-            if re.search(r"\b(yes|yeah|yep|ok|okay|allow|confirm|go ahead|sure)\b", lower):
-                self._answer_os_question(self._pending_os_question, allowed=True)
-                self.ask_input.setEnabled(True)
-                return
-            if re.search(r"\b(no|nope|don't|do not|cancel)\b", lower):
-                self._answer_os_question(self._pending_os_question, allowed=False)
-                self.ask_input.setEnabled(True)
-                return
-
         if self._looks_like_os_question(text):
-            self._pending_os_question = text
-            answer = (
-                "Lotus can check read-only operating-system details for this question "
-                "(OS, CPU, memory, disk, Python version). Nothing will be changed. "
-                "Reply yes to allow this one check."
-            )
-            db.add_message("assistant", answer)
-            db.remember_request(text, answer, model="permission-prompt")
-            db.log("info", "permission", "asked permission for OS info")
-            self._append_chat("Lotus", answer)
-            self.ask_input.setEnabled(True)
+            self._answer_os_question(text, allowed=True)
             return
 
         self._set_chat_status("Lotus is thinking…")
@@ -410,12 +389,12 @@ class MainWindow(QMainWindow):
         else:
             try:
                 info = platform_info.collect()
-                answer = "Here is the read-only system information you allowed:\n\n" + info
+                answer = "Here is the read-only system information:\n\n" + info
             except Exception as exc:
                 answer = f"I could not collect system information: {exc}"
         db.add_message("assistant", answer)
         db.remember_request(original, answer, model="local-system-info")
-        db.log("info", "permission", "OS info permission answered")
+        db.log("info", "system", "OS info collected")
         self._append_chat("Lotus", answer)
         self._set_chat_status("Lotus online — cybersecurity mode")
         self.refresh_logs()

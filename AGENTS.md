@@ -18,7 +18,7 @@ Lotus is a standalone Windows-first cybersecurity AI beta. Keep it separate from
 1. Never commit `config/api_keys.json`, `.env`, or anything under `memory/`.
 2. Windows is the only supported beta platform; do not break the code for other OSes, but do not claim support.
 3. Scanner actions must quarantine rather than delete. Do not add silent deletion.
-4. OS-level actions require explicit user permission in the UI flow.
+4. Read-only system info checks are allowed after install; OS-level changes still require explicit user permission in the UI flow.
 5. Bump `version.json` and `lotus/__init__.py` together for beta changes.
 6. After editing Python, run `python scripts/check.py`.
 7. Releases are Windows zips built by `python scripts/build_beta_zip.py`.
