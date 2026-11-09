@@ -9,6 +9,7 @@ Lotus is a Windows-first cybersecurity assistant built for SOC analysis, AppSec,
 - `remember:` / `forget` memory commands
 - Read-only OS info checks only after you approve the specific question
 - Folder virus scan with quarantine instead of deletion
+- Scan target dropdown for Downloads and detected local/external drives
 - GitHub repository code scan for risky patterns
 - GitHub release update check and Windows self-update staging
 - Local-only secrets in `config/api_keys.json` (never committed)

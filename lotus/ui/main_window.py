@@ -9,6 +9,7 @@ import sys
 import threading
 from pathlib import Path
 
+import psutil
 from PyQt6.QtCore import QStandardPaths, Qt, QTimer
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
@@ -262,11 +263,21 @@ class MainWindow(QMainWindow):
         self.scan_mode = QComboBox()
         self.scan_mode.addItem("Folder scan", "folder")
         self.scan_mode.addItem("GitHub repo scan", "github")
+        self.scan_mode.currentIndexChanged.connect(self._on_scan_mode_changed)
         layout.addWidget(self.scan_mode)
+
+        self.scan_target_choice = QComboBox()
+        self.scan_target_choice.currentIndexChanged.connect(self._apply_scan_target_choice)
+        target_choice_row = QHBoxLayout()
+        target_choice_row.addWidget(self.scan_target_choice, 1)
+        refresh_targets = QPushButton("Refresh drives")
+        refresh_targets.clicked.connect(self._refresh_scan_targets)
+        target_choice_row.addWidget(refresh_targets)
+        layout.addLayout(target_choice_row)
 
         self.scan_target = QLineEdit()
         self.scan_target.setText(str(Path.home() / "Downloads"))
-        self.scan_target.setPlaceholderText("Folder path or github.com/owner/repo")
+        self.scan_target.setPlaceholderText("Folder path, drive, or github.com/owner/repo")
         layout.addWidget(self.scan_target)
 
         scan_row = QHBoxLayout()
@@ -281,6 +292,7 @@ class MainWindow(QMainWindow):
         self.scan_status = QLabel("no viruses detected")
         self.scan_status.setObjectName("status")
         layout.addWidget(self.scan_status)
+        self._refresh_scan_targets()
         return panel
 
     def _make_table(self, columns: list[str]) -> QTableWidget:
@@ -469,6 +481,59 @@ class MainWindow(QMainWindow):
         if answer == QMessageBox.StandardButton.Yes:
             db.clear_logs()
             self.refresh_logs()
+
+    @staticmethod
+    def _scan_target_options() -> list[tuple[str, str]]:
+        options = [("Downloads", str(Path.home() / "Downloads"))]
+        try:
+            partitions = psutil.disk_partitions(all=True)
+        except Exception:
+            partitions = []
+        seen = set()
+        drives = []
+        for part in partitions:
+            mount = part.mountpoint
+            if not re.match(r"^[A-Za-z]:\\$", mount):
+                continue
+            key = mount.upper()
+            if key in seen:
+                continue
+            seen.add(key)
+            try:
+                usage = psutil.disk_usage(mount)
+                free_gb = usage.free / (1024 ** 3)
+            except Exception:
+                free_gb = 0.0
+            opts = (part.opts or "").lower()
+            kind = "external" if "removable" in opts or "cdrom" in opts else "local"
+            drives.append((mount, kind, free_gb))
+        for mount, kind, free_gb in sorted(drives, key=lambda item: item[0].lower()):
+            drive_letter = mount.split(":", 1)[0] + ":"
+            options.append((f"{drive_letter} — {kind} ({free_gb:.0f} GB free)", mount))
+        return options
+
+    def _refresh_scan_targets(self):
+        current = self.scan_target_choice.currentData()
+        self.scan_target_choice.blockSignals(True)
+        self.scan_target_choice.clear()
+        for label, path in self._scan_target_options():
+            self.scan_target_choice.addItem(label, path)
+        index = self.scan_target_choice.findData(current) if current else 0
+        self.scan_target_choice.setCurrentIndex(max(index, 0))
+        self.scan_target_choice.blockSignals(False)
+        if self.scan_mode.currentData() == "folder":
+            self._apply_scan_target_choice()
+
+    def _apply_scan_target_choice(self, *_):
+        if self.scan_mode.currentData() != "folder":
+            return
+        data = self.scan_target_choice.currentData()
+        if data:
+            self.scan_target.setText(data)
+
+    def _on_scan_mode_changed(self):
+        if self.scan_mode.currentData() == "folder":
+            self._apply_scan_target_choice()
 
     # ── Scanner ─────────────────────────────────────────────────────────────
     def _run_scan(self):
