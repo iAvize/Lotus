@@ -15,13 +15,15 @@ Lotus is a Windows-first cybersecurity assistant built for SOC analysis, AppSec,
 
 ## Install on Windows
 
-1. Download `Lotus-Beta-<version>-Windows.zip` from GitHub Releases.
-2. Extract it.
-3. Run `scripts\setup_windows.bat` once. It creates `.venv` and installs dependencies.
-4. Run `Run-Lotus.bat`.
-5. On first launch, paste your Gemini API key, if you do not know how to get one, there is a link in launcher to take you to Gemini AI Studio to create one.
+1. Download `Lotus.Beta.exe` from GitHub Releases.
+2. Run `Lotus.Beta.exe`.
+3. On first launch, Lotus prompts for your own Gemini API key and links to Google AI Studio where you can create one. You can also import the key Jarvis already uses on this PC if you have one.
 
-Python 3.11–3.14 is preferred. The setup script chooses the newest supported `py` launcher version it finds.
+`Lotus.Beta.zip` is the scriptable beta package for users who prefer running from source/scripts. After extracting `Lotus Beta`, run `Lotus Beta.bat` only if you are not using the exe.
+
+`Lotus.Source.Trusted.Developers.zip` is trusted developer access only and is password-protected. It includes the source code and the Windows app.
+
+Python 3.11–3.14 is preferred when running from source.
 
 ## Scanner safety
 
