@@ -267,18 +267,19 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.scan_mode)
 
         self.scan_target_choice = QComboBox()
-        self.scan_target_choice.currentIndexChanged.connect(self._apply_scan_target_choice)
-        target_choice_row = QHBoxLayout()
+        self.scan_target_choice_widget = QWidget()
+        target_choice_row = QHBoxLayout(self.scan_target_choice_widget)
+        target_choice_row.setContentsMargins(0, 0, 0, 0)
         target_choice_row.addWidget(self.scan_target_choice, 1)
         refresh_targets = QPushButton("Refresh drives")
         refresh_targets.clicked.connect(self._refresh_scan_targets)
         target_choice_row.addWidget(refresh_targets)
-        layout.addLayout(target_choice_row)
+        layout.addWidget(self.scan_target_choice_widget)
 
-        self.scan_target = QLineEdit()
-        self.scan_target.setText(str(Path.home() / "Downloads"))
-        self.scan_target.setPlaceholderText("Folder path, drive, or github.com/owner/repo")
-        layout.addWidget(self.scan_target)
+        self.github_target = QLineEdit()
+        self.github_target.setPlaceholderText("github.com/owner/repo")
+        self.github_target.hide()
+        layout.addWidget(self.github_target)
 
         scan_row = QHBoxLayout()
         self.scan_button = QPushButton("Scan")
@@ -293,6 +294,7 @@ class MainWindow(QMainWindow):
         self.scan_status.setObjectName("status")
         layout.addWidget(self.scan_status)
         self._refresh_scan_targets()
+        self._on_scan_mode_changed()
         return panel
 
     def _make_table(self, columns: list[str]) -> QTableWidget:
@@ -521,27 +523,25 @@ class MainWindow(QMainWindow):
         index = self.scan_target_choice.findData(current) if current else 0
         self.scan_target_choice.setCurrentIndex(max(index, 0))
         self.scan_target_choice.blockSignals(False)
-        if self.scan_mode.currentData() == "folder":
-            self._apply_scan_target_choice()
-
-    def _apply_scan_target_choice(self, *_):
-        if self.scan_mode.currentData() != "folder":
-            return
-        data = self.scan_target_choice.currentData()
-        if data:
-            self.scan_target.setText(data)
 
     def _on_scan_mode_changed(self):
-        if self.scan_mode.currentData() == "folder":
-            self._apply_scan_target_choice()
+        is_folder = self.scan_mode.currentData() == "folder"
+        self.scan_target_choice_widget.setVisible(is_folder)
+        self.github_target.setVisible(not is_folder)
 
     # ── Scanner ─────────────────────────────────────────────────────────────
     def _run_scan(self):
         mode = self.scan_mode.currentData()
-        target = self.scan_target.text().strip()
-        if not target:
-            QMessageBox.warning(self, "Scan target", "Enter a folder path or GitHub repository first.")
-            return
+        if mode == "github":
+            target = self.github_target.text().strip()
+            if not target:
+                QMessageBox.warning(self, "Scan target", "Enter a GitHub repository first.")
+                return
+        else:
+            target = self.scan_target_choice.currentData() or ""
+            if not target:
+                QMessageBox.warning(self, "Scan target", "Choose a scan target first.")
+                return
         self.scan_button.setEnabled(False)
         self.scan_status.setText("Scanning…")
         self.scan_details.setHtml("<i>Scanning…</i>")
