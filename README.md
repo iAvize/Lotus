@@ -17,7 +17,7 @@ Lotus is a Windows-first cybersecurity assistant built for SOC analysis, AppSec,
 
 1. Download `Lotus.Beta.exe` from GitHub Releases.
 2. Run `Lotus.Beta.exe`.
-3. On first launch, Lotus prompts for your own Gemini API key and links to Google AI Studio where you can create one. You can also import the key Jarvis already uses on this PC if you have one.
+3. On first launch, Lotus prompts for your own Gemini API key and links to Google AI Studio where you can create one.
 
 `Lotus.Beta.zip` is the scriptable beta package for users who prefer running from source/scripts. After extracting `Lotus Beta`, run `Lotus Beta.bat` only if you are not using the exe.
 
