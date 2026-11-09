@@ -48,8 +48,17 @@ def check_for_update(repo: str = REPO, timeout: int = 15) -> dict | None:
 
     assets = data.get("assets") or []
     zip_assets = [a for a in assets if str(a.get("name", "")).lower().endswith(".zip")]
-    preferred = [a for a in zip_assets if "windows" in str(a.get("name", "")).lower()]
-    asset = (preferred or zip_assets or [None])[0]
+
+    def asset_score(asset: dict) -> int:
+        name = str(asset.get("name", "")).lower()
+        score = 1
+        if "beta" in name or "windows" in name:
+            score += 2
+        if "source" in name:
+            score -= 3
+        return score
+
+    asset = max(zip_assets, key=asset_score, default=None)
     return {
         "repo": repo,
         "version": remote,

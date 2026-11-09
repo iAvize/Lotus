@@ -67,11 +67,11 @@ def build(kind: str) -> Path:
     ver = version()
     DIST.mkdir(exist_ok=True)
     if kind == "app":
-        out = DIST / f"Lotus-Beta-{ver}-Windows.zip"
+        out = DIST / "Lotus Beta.zip"
         arc_root = "Lotus"
         predicate = include_in_app
     else:
-        out = DIST / f"Lotus-Source-{ver}.zip"
+        out = DIST / "Lotus Source.zip"
         arc_root = "Lotus"
         predicate = lambda path: not excluded(path)
 

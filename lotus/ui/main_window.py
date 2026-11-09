@@ -8,6 +8,7 @@ import threading
 from pathlib import Path
 
 from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
     QApplication, QComboBox, QFrame, QHBoxLayout, QHeaderView, QLabel,
     QLineEdit, QMainWindow, QMessageBox, QPushButton, QScrollBar, QTableWidget,
@@ -52,6 +53,9 @@ class MainWindow(QMainWindow):
         self.resize(1240, 780)
         self.setMinimumSize(1020, 680)
         self.setStyleSheet(APP_STYLESHEET)
+        icon_path = Path(__file__).resolve().parents[1] / "assets" / "lotus.ico"
+        if icon_path.exists():
+            self.setWindowIcon(QIcon(str(icon_path)))
 
         self._jobs: list[tuple[queue.Queue, object, object]] = []
         self._poll_timer = QTimer(self)
