@@ -185,6 +185,11 @@ class MainWindow(QMainWindow):
         self.chat_view.setMinimumHeight(190)
         layout.addWidget(self.chat_view, 1)
 
+        self.thinking_label = QLabel("Lotus is thinking…")
+        self.thinking_label.setStyleSheet("color: #c4b5fd; font-style: italic;")
+        self.thinking_label.hide()
+        layout.addWidget(self.thinking_label)
+
         ask_row = QHBoxLayout()
         self.ask_input = QLineEdit()
         self.ask_input.setPlaceholderText("Ask a question…")
@@ -331,6 +336,7 @@ class MainWindow(QMainWindow):
             return
 
         self._set_chat_status("Lotus is thinking…")
+        self.thinking_label.show()
         self._run_bg(
             lambda: ai.ask(text),
             on_ok=self._on_answer,
@@ -366,6 +372,7 @@ class MainWindow(QMainWindow):
         self.refresh_logs()
 
     def _on_answer(self, answer: str):
+        self.thinking_label.hide()
         self._append_chat("Lotus", answer)
         self._set_chat_status("Lotus online — cybersecurity mode")
         self.ask_input.setEnabled(True)
@@ -374,6 +381,7 @@ class MainWindow(QMainWindow):
         self.refresh_memories()
 
     def _on_answer_error(self, exc: Exception):
+        self.thinking_label.hide()
         self._append_chat("Lotus", f"I hit an error: {exc}")
         self._set_chat_status("Lotus online — cybersecurity mode")
         self.ask_input.setEnabled(True)
