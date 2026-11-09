@@ -32,6 +32,12 @@ APP_SCRIPTS = {
     "setup_windows.bat",
 }
 
+LAUNCHER_BAT = (
+    "@echo off\r\n"
+    "powershell -NoProfile -ExecutionPolicy Bypass -File \"%~dp0scripts\\Run-Lotus.ps1\"\r\n"
+    "exit /b %ERRORLEVEL%\r\n"
+)
+
 
 def version() -> str:
     data = json.loads((ROOT / "version.json").read_text(encoding="utf-8"))
@@ -64,22 +70,24 @@ def add_file(zf: zipfile.ZipFile, path: Path, arc_root: str) -> None:
 
 
 def build(kind: str) -> Path:
-    ver = version()
     DIST.mkdir(exist_ok=True)
     if kind == "app":
         out = DIST / "Lotus Beta.zip"
-        arc_root = "Lotus"
+        arc_root = "Lotus Beta"
         predicate = include_in_app
+        launcher = "Lotus Beta.bat"
     else:
         out = DIST / "Lotus Source.zip"
-        arc_root = "Lotus"
+        arc_root = "Lotus Source"
         predicate = lambda path: not excluded(path)
+        launcher = "Lotus Source.bat"
 
     with zipfile.ZipFile(out, "w", compression=zipfile.ZIP_DEFLATED) as zf:
         for path in sorted(ROOT.rglob("*")):
             if not path.is_file() or excluded(path) or not predicate(path):
                 continue
             add_file(zf, path, arc_root)
+        zf.writestr(f"{arc_root}/{launcher}", LAUNCHER_BAT)
 
     print(f"built {out.relative_to(ROOT)}")
     return out
