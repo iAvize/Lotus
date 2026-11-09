@@ -1,7 +1,6 @@
 # Lotus — Cybersecurity AI (Windows Beta)
 
-Lotus is a Windows-first cybersecurity assistant built for SOC analysis, AppSec, DevSecOps, secure coding, malware awareness, and general research/help. It is currently in **public beta** and is intentionally separate from the Herdr SOC team.
-
+Lotus is a Windows-first cybersecurity assistant built for SOC analysis, AppSec, DevSecOps, secure coding, malware awareness, and general research/help. It is currently in **public beta**.
 ## Beta features
 
 - Purple reactor + Matrix-rain desktop UI
