@@ -53,8 +53,8 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Lotus")
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
-        self.resize(1240, 780)
-        self.setMinimumSize(1020, 680)
+        self.resize(1360, 800)
+        self.setMinimumSize(1120, 720)
         self.setStyleSheet(APP_STYLESHEET)
         icon_path = Path(__file__).resolve().parents[1] / "assets" / "lotus.ico"
         if icon_path.exists():
@@ -210,13 +210,13 @@ class MainWindow(QMainWindow):
     def _build_left_panel(self) -> QFrame:
         panel = QFrame()
         panel.setObjectName("panel")
-        panel.setFixedWidth(460)
+        panel.setFixedWidth(620)
         layout = QHBoxLayout(panel)
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(10)
 
         nav = QFrame()
-        nav.setFixedWidth(132)
+        nav.setFixedWidth(150)
         nav_layout = QVBoxLayout(nav)
         nav_layout.setContentsMargins(0, 0, 0, 0)
         nav_layout.setSpacing(8)
