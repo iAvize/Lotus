@@ -14,7 +14,7 @@ from PyQt6.QtCore import QStandardPaths, Qt, QTimer
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
     QApplication, QComboBox, QFrame, QHBoxLayout, QHeaderView, QLabel,
-    QLineEdit, QMainWindow, QMessageBox, QPushButton, QScrollBar, QTableWidget,
+    QLineEdit, QMainWindow, QMessageBox, QPushButton, QScrollBar, QStackedWidget, QTableWidget,
     QTableWidgetItem, QTabWidget, QTextBrowser, QTextEdit, QVBoxLayout, QWidget,
 )
 
@@ -210,16 +210,61 @@ class MainWindow(QMainWindow):
     def _build_left_panel(self) -> QFrame:
         panel = QFrame()
         panel.setObjectName("panel")
-        panel.setFixedWidth(410)
-        layout = QVBoxLayout(panel)
-        layout.setContentsMargins(12, 12, 12, 12)
+        panel.setFixedWidth(460)
+        layout = QHBoxLayout(panel)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(10)
+
+        nav = QFrame()
+        nav.setFixedWidth(132)
+        nav_layout = QVBoxLayout(nav)
+        nav_layout.setContentsMargins(0, 0, 0, 0)
+        nav_layout.setSpacing(8)
+
+        self.section_stack = QStackedWidget()
+        self._section_pages = {}
+        self._section_buttons = {}
+
+        self._register_section("ask", "Ask Lotus", self._build_ask_page(), nav_layout)
+        self._register_section("logs", "Logs / Memory", self._build_logs_page(), nav_layout)
+        self._register_section("scan", "File / Repo Scan", self._build_scan_page(), nav_layout)
+        nav_layout.addStretch(1)
+
+        layout.addWidget(nav)
+        layout.addWidget(self.section_stack, 1)
+
+        self._refresh_scan_targets()
+        self._on_scan_mode_changed()
+        self._show_section("ask")
+        return panel
+
+    def _register_section(self, key: str, title: str, page: QWidget, nav_layout: QVBoxLayout):
+        button = QPushButton(title)
+        button.setObjectName("navButton")
+        button.setCheckable(True)
+        button.setCursor(Qt.CursorShape.PointingHandCursor)
+        button.clicked.connect(lambda checked=False, section_key=key: self._show_section(section_key))
+        nav_layout.addWidget(button)
+        self._section_pages[key] = self.section_stack.addWidget(page)
+        self._section_buttons[key] = button
+
+    def _show_section(self, key: str):
+        if key not in self._section_pages:
+            return
+        for section_key, button in self._section_buttons.items():
+            button.setChecked(section_key == key)
+        self.section_stack.setCurrentIndex(self._section_pages[key])
+
+    def _build_ask_page(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)
 
-        layout.addWidget(self._section_label("ASK LOTUS"))
         self.chat_view = QTextBrowser()
         self.chat_view.setOpenExternalLinks(True)
-        self.chat_view.setMinimumHeight(260)
-        layout.addWidget(self.chat_view, 3)
+        self.chat_view.setMinimumHeight(240)
+        layout.addWidget(self.chat_view, 1)
 
         self.thinking_label = QLabel("Lotus is thinking…")
         self.thinking_label.setStyleSheet("color: #c4b5fd; font-style: italic;")
@@ -236,8 +281,14 @@ class MainWindow(QMainWindow):
         ask_row.addWidget(self.ask_input, 1)
         ask_row.addWidget(send)
         layout.addLayout(ask_row)
+        return page
 
-        layout.addWidget(self._section_label("LOGS / MEMORY"))
+    def _build_logs_page(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(8)
+
         self.log_tabs = QTabWidget()
         self.logs_table = self._make_table(["Time", "Level", "Source", "Message"])
         self.requests_table = self._make_table(["Time", "Model", "Search", "Prompt", "Response"])
@@ -245,7 +296,7 @@ class MainWindow(QMainWindow):
         self.log_tabs.addTab(self.logs_table, "Activity")
         self.log_tabs.addTab(self.requests_table, "Requests")
         self.log_tabs.addTab(self.memory_table, "Memory")
-        self.log_tabs.setMinimumHeight(110)
+        self.log_tabs.setMinimumHeight(160)
         layout.addWidget(self.log_tabs, 1)
 
         log_buttons = QHBoxLayout()
@@ -258,8 +309,14 @@ class MainWindow(QMainWindow):
         log_buttons.addWidget(clear)
         log_buttons.addStretch(1)
         layout.addLayout(log_buttons)
+        return page
 
-        layout.addWidget(self._section_label("FILE / REPO SCAN"))
+    def _build_scan_page(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(8)
+
         self.scan_mode = QComboBox()
         self.scan_mode.addItem("Folder scan", "folder")
         self.scan_mode.addItem("GitHub repo scan", "github")
@@ -285,17 +342,15 @@ class MainWindow(QMainWindow):
         self.scan_button = QPushButton("Scan")
         self.scan_button.clicked.connect(self._run_scan)
         self.scan_details = QTextBrowser()
-        self.scan_details.setMinimumHeight(50)
+        self.scan_details.setMinimumHeight(120)
         scan_row.addWidget(self.scan_button)
         scan_row.addWidget(self.scan_details, 1)
-        layout.addLayout(scan_row)
+        layout.addLayout(scan_row, 1)
 
         self.scan_status = QLabel("no viruses detected")
         self.scan_status.setObjectName("status")
         layout.addWidget(self.scan_status)
-        self._refresh_scan_targets()
-        self._on_scan_mode_changed()
-        return panel
+        return page
 
     def _make_table(self, columns: list[str]) -> QTableWidget:
         table = QTableWidget(0, len(columns))

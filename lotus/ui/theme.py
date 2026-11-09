@@ -51,6 +51,25 @@ QPushButton#dangerButton {
     background: #4c1d95;
     border-color: #7c3aed;
 }
+QPushButton#navButton {
+    background: #160d2c;
+    border: 1px solid #3b2168;
+    border-radius: 10px;
+    color: #cbb7ff;
+    padding: 10px 12px;
+    text-align: left;
+    font-weight: 600;
+}
+QPushButton#navButton:hover {
+    background: #241243;
+    border-color: #7c3aed;
+    color: #f3edff;
+}
+QPushButton#navButton:checked {
+    background: #2d1a55;
+    border-color: #a78bfa;
+    color: #f5efff;
+}
 QLineEdit, QTextEdit, QPlainTextEdit, QTextBrowser, QComboBox {
     background: #130b24;
     border: 1px solid #43257a;

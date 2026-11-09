@@ -22,3 +22,4 @@ Lotus is a standalone Windows-first cybersecurity AI beta. Keep it separate from
 5. Bump `version.json` and `lotus/__init__.py` together for beta changes.
 6. After editing Python, run `python scripts/check.py`.
 7. Releases are Windows zips built by `python scripts/build_beta_zip.py`.
+8. New left-panel features must be registered with `_register_section` so each feature gets its own clickable panel.
