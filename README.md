@@ -19,7 +19,7 @@ Lotus is a Windows-first cybersecurity assistant built for SOC analysis, AppSec,
 2. Extract it.
 3. Run `scripts\setup_windows.bat` once. It creates `.venv` and installs dependencies.
 4. Run `Run-Lotus.bat`.
-5. On first launch, paste your Gemini API key or choose **Import from Jarvis**.
+5. On first launch, paste your Gemini API key or choose **Import from Jarvis** (I copied my own Jarvis AI Gemini key into this, but you may use your own Gemini key).
 
 Python 3.11–3.14 is preferred. The setup script chooses the newest supported `py` launcher version it finds.
 
@@ -41,15 +41,12 @@ The scanner can read a public GitHub repo as `github.com/owner/repo` or `owner/r
 
 Lotus checks GitHub Releases on launch. When a newer Windows beta zip is published, an **Update** button appears in the top-right. The updater downloads the release asset, stages it, and restarts Lotus.
 
-## Developer / source access
 
-The public repository contains the full source. `Lotus-Source-<version>.zip` is also attached to releases for developers who want a clean snapshot. Beta users do not get developer-only controls.
-
-## Roadmap / intentionally skipped for beta
+## Here is the roadmap for future updates
 
 - iOS, Android, Mac, Linux, and app-store builds
 - Paid personal/enterprise tiers, quotas, and billing
-- Multi-AI fallback providers (retracted for now; Lotus uses Gemini directly)
+- Multi-AI fallback providers
 - VirtualBox/VM sandbox for untrusted code execution
 - Automatic GitHub pull requests or vulnerability rewrites
 - Voice interface, plugins, remote dashboard, enterprise SSO/audit exports
