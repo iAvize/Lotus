@@ -1,0 +1,7 @@
+{
+  "version": "0.1.0-beta.1",
+  "codename": "reactor",
+  "channel": "beta",
+  "repository": "iAvize/Lotus",
+  "platforms": ["windows"]
+}
