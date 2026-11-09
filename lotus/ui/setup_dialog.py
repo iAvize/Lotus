@@ -32,6 +32,15 @@ class SetupDialog(QDialog):
         explainer.setStyleSheet("color: #bda9ee;")
         layout.addWidget(explainer)
 
+        key_link = QLabel(
+            'Need a key? <a href="https://aistudio.google.com/apikey">'
+            'Create a free Gemini API key in Google AI Studio</a>.'
+        )
+        key_link.setOpenExternalLinks(True)
+        key_link.setWordWrap(True)
+        key_link.setStyleSheet("color: #c4b5fd;")
+        layout.addWidget(key_link)
+
         self.key_edit = QLineEdit()
         self.key_edit.setEchoMode(QLineEdit.EchoMode.Password)
         self.key_edit.setPlaceholderText("Paste Gemini API key")
