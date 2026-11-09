@@ -4,10 +4,12 @@ from __future__ import annotations
 import html
 import queue
 import re
+import subprocess
+import sys
 import threading
 from pathlib import Path
 
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import QStandardPaths, Qt, QTimer
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
     QApplication, QComboBox, QFrame, QHBoxLayout, QHeaderView, QLabel,
@@ -56,6 +58,7 @@ class MainWindow(QMainWindow):
         icon_path = Path(__file__).resolve().parents[1] / "assets" / "lotus.ico"
         if icon_path.exists():
             self.setWindowIcon(QIcon(str(icon_path)))
+        self._ensure_desktop_shortcut()
 
         self._jobs: list[tuple[queue.Queue, object, object]] = []
         self._poll_timer = QTimer(self)
@@ -70,6 +73,38 @@ class MainWindow(QMainWindow):
         self.refresh_logs()
         self.refresh_memories()
         QTimer.singleShot(800, self._check_update)
+
+    def _ensure_desktop_shortcut(self):
+        if sys.platform != "win32" or not getattr(sys, "frozen", False):
+            return
+        desktop = Path(QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DesktopLocation))
+        link = desktop / "Lotus Beta.lnk"
+        if link.exists():
+            return
+        exe = Path(sys.executable)
+        base = config.BASE_DIR
+
+        def psq(path: Path) -> str:
+            return str(path).replace("'", "''")
+
+        command = (
+            "$ws = New-Object -ComObject WScript.Shell; "
+            f"$s = $ws.CreateShortcut('{psq(link)}'); "
+            f"$s.TargetPath = '{psq(exe)}'; "
+            f"$s.WorkingDirectory = '{psq(base)}'; "
+            f"$s.IconLocation = '{psq(exe)},0'; "
+            "$s.Description = 'Lotus Cybersecurity AI'; "
+            "$s.Save()"
+        )
+        result = subprocess.run(
+            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+            check=False,
+        )
+        if result.returncode == 0 and link.exists():
+            db.log("info", "desktop", "created desktop shortcut")
 
     # ── Background jobs ─────────────────────────────────────────────────────
     def _run_bg(self, fn, on_ok=None, on_err=None):
