@@ -20,6 +20,7 @@ EXCLUDE_SUFFIXES = {".pyc", ".pyo", ".log"}
 
 APP_TOP_LEVEL = {
     "lotus",
+    "run_lotus.py",
     "Run-Lotus.bat",
     "requirements.txt",
     "README.md",
