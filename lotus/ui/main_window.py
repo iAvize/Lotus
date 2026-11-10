@@ -10,7 +10,7 @@ import threading
 from pathlib import Path
 
 import psutil
-from PyQt6.QtCore import QStandardPaths, Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import QEasingCurve, QPropertyAnimation, QStandardPaths, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
     QApplication, QComboBox, QFrame, QHBoxLayout, QHeaderView, QLabel,
@@ -505,10 +505,29 @@ class MainWindow(QMainWindow):
         return center
 
     def _toggle_fullscreen(self):
+        anim = getattr(self, "_fs_anim", None)
+        if anim is not None and anim.state() == QPropertyAnimation.State.Running:
+            return
+        screen_geom = self.screen().geometry()
         if self.isFullScreen():
+            end = getattr(self, "_saved_geom", None) or self.normalGeometry()
             self.showNormal()
+            self.setGeometry(screen_geom)  # hold the fullscreen look while shrinking back
+            self._fs_anim = self._animate_geometry(end)
         else:
-            self.showFullScreen()
+            self._saved_geom = self.geometry()
+            self._fs_anim = self._animate_geometry(screen_geom, done=self.showFullScreen)
+
+    def _animate_geometry(self, target, done=None):
+        a = QPropertyAnimation(self, b"geometry", self)
+        a.setDuration(650)
+        a.setStartValue(self.geometry())
+        a.setEndValue(target)
+        a.setEasingCurve(QEasingCurve.Type.InOutCubic)
+        if done:
+            a.finished.connect(done)
+        a.start()
+        return a
 
     def apply_theme(self, name: str):
         """Switch the accent palette instantly — widgets repaint on their own
