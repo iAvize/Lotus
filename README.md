@@ -22,7 +22,7 @@ Lotus is a Windows cybersecurity assistant built for SOC analysis, AppSec, DevSe
 
 `Lotus.Beta.zip` exe + docs only. This is for people who want a zipped version of the release over the exe only release.
 
-`Lotus.Source.Trusted.Developers.zip` is trusted developer access only and is password-protected. It includes the source code and the Windows app.
+`Lotus.Source.Trusted.Developers.zip` is trusted developer access only and is password-protected. It includes the source code.
 
 Python 3.11–3.14 is preferred when running from source.
 
