@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 from datetime import datetime
 
-from . import config, db, personality
+from . import config, db, personality, usage
 
 MODEL_LADDER = (
     "gemini-3.5-flash-lite",
@@ -171,6 +171,12 @@ def _generate(prompt: str, *, use_search: bool = False, use_devbox: bool = False
     for model in MODEL_LADDER:
         try:
             response = _backend_call(client, model, prompt, cfg)
+            try:
+                um = getattr(response, "usage_metadata", None)
+                if um and getattr(um, "total_token_count", None):
+                    usage.record_tokens(int(um.total_token_count), model)
+            except Exception:
+                pass
             text = _response_text(response)
             if text:
                 return text, model
@@ -210,13 +216,19 @@ def _generate_stream(prompt: str, on_chunk, timeout_ms: int = 45_000) -> tuple[s
     for model in MODEL_LADDER:
         try:
             parts: list[str] = []
+            tok = 0
             for chunk in _backend_call(client, model, prompt, cfg, stream=True):
+                um = getattr(chunk, "usage_metadata", None)
+                if um and getattr(um, "total_token_count", None):
+                    tok = int(um.total_token_count)
                 piece = getattr(chunk, "text", "") or ""
                 if piece:
                     parts.append(piece)
                     on_chunk(piece)
             text = "".join(parts)
             if text:
+                if tok:
+                    usage.record_tokens(tok, model)
                 return text, model
             errors.append(f"{model}: empty response")
         except Exception as exc:

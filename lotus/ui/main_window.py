@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
     QTableWidgetItem, QTabWidget, QTextBrowser, QTextEdit, QVBoxLayout, QWidget,
 )
 
-from .. import __version__, ai, config, db, devbox, github, personality, platform_info, scanner, updater
+from .. import __version__, ai, config, db, devbox, github, personality, platform_info, scanner, updater, usage
 from . import theme
 from .settings_dialog import SettingsDialog
 from .widgets import MatrixRain, ReactorWidget
@@ -345,6 +345,18 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)
 
+        view_row = QHBoxLayout()
+        view_row.addWidget(QLabel("View:"))
+        self.log_view = QComboBox()
+        self.log_view.addItem("Activity", "logs")
+        self.log_view.addItem("My usage", "usage")
+        if usage.is_dev_build():
+            self.log_view.addItem("Global minutes", "global")
+        self.log_view.currentIndexChanged.connect(self._on_log_view)
+        view_row.addWidget(self.log_view)
+        view_row.addStretch(1)
+        layout.addLayout(view_row)
+
         self.log_tabs = QTabWidget()
         self.logs_table = self._make_table(["Time", "Level", "Source", "Message"])
         self.requests_table = self._make_table(["Time", "Model", "Search", "Prompt", "Response"])
@@ -354,6 +366,10 @@ class MainWindow(QMainWindow):
         self.log_tabs.addTab(self.memory_table, "Memory")
         self.log_tabs.setMinimumHeight(160)
         layout.addWidget(self.log_tabs, 1)
+
+        self.usage_view = QTextBrowser()
+        self.usage_view.hide()
+        layout.addWidget(self.usage_view, 1)
 
         log_buttons = QHBoxLayout()
         refresh = QPushButton("Refresh")
@@ -366,6 +382,45 @@ class MainWindow(QMainWindow):
         log_buttons.addStretch(1)
         layout.addLayout(log_buttons)
         return page
+
+    def _on_log_view(self, _i: int):
+        mode = self.log_view.currentData()
+        show_logs = mode == "logs"
+        self.log_tabs.setVisible(show_logs)
+        self.usage_view.setVisible(not show_logs)
+        if not show_logs:
+            self._refresh_usage_view()
+
+    def _refresh_usage_view(self):
+        if not hasattr(self, "usage_view") or not self.usage_view.isVisible():
+            return
+        if self.log_view.currentData() == "global":
+            rows = usage.global_rollup()
+            parts = ["<b>Global minutes — all installs on this machine</b><br><br>"]
+            if not rows:
+                parts.append("<i>No installs reporting yet.</i>")
+            for r in rows:
+                parts.append(
+                    f"<div style='margin:6px 0;'><b>{html.escape(r['install'])}</b> "
+                    f"(install <i>{html.escape(r['id'])}</i>)<br>"
+                    f"&nbsp;&nbsp;tokens: {r['tokens']:,.0f} &nbsp;·&nbsp; "
+                    f"VM minutes: {r['vm_minutes']:,.1f}</div>")
+            tt = sum(r["tokens"] for r in rows)
+            tv = sum(r["vm_minutes"] for r in rows)
+            parts.append(f"<br><b>Totals — tokens: {tt:,.0f} · VM minutes: {tv:,.1f}</b>")
+            self.usage_view.setHtml("".join(parts))
+        else:
+            s = usage.summary()
+            def fmt(p):
+                return f"tokens <b>{p['tokens']:,.0f}</b> · VM <b>{p['vm_minutes']:,.1f}</b> min"
+            self.usage_view.setHtml(
+                f"<b>My usage</b> <i>(install {html.escape(s['install_id'])})</i><br><br>"
+                f"Today:&nbsp;&nbsp;{fmt(s['today'])}<br>"
+                f"This month:&nbsp;&nbsp;{fmt(s['month'])}<br>"
+                f"All time:&nbsp;&nbsp;{fmt(s['all_time'])}<br><br>"
+                "<i>Counts Gemini tokens reported by the API and minutes the "
+                "Lotus-Lab VM was running. Beta metering is display-only — "
+                "nothing limits your usage.</i>")
 
     def _build_scan_page(self) -> QWidget:
         page = QWidget()
@@ -775,6 +830,7 @@ class MainWindow(QMainWindow):
             for col, value in enumerate(values):
                 self.logs_table.setItem(i, col, QTableWidgetItem(str(value)))
         self.logs_table.scrollToBottom()
+        self._refresh_usage_view()
 
         requests = db.recent_requests(200)
         self.requests_table.setRowCount(len(requests))

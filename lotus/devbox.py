@@ -14,6 +14,8 @@ Guest credentials live in config/devbox.json (git-ignored), set with
 """
 from __future__ import annotations
 
+from . import usage
+
 import difflib
 import json
 import os
@@ -281,6 +283,7 @@ def ensure_running(timeout_s: int = 300) -> dict:
         r = _run("startvm", VM_NAME, "--type", "headless")
         if r.returncode != 0:
             return {"ok": False, "error": (r.stderr or r.stdout or "startvm failed").strip()[:300]}
+        usage.vm_boot()
     if not _creds():
         return dict(_NOT_CONFIGURED)
     deadline = time.time() + timeout_s
@@ -304,10 +307,13 @@ def _poweroff(timeout_s: int = 75) -> bool:
     while time.time() < deadline:
         if _vm_state() != "running":
             time.sleep(2)
+            usage.vm_shutdown()
             return True
         time.sleep(3)
     r = _run("controlvm", VM_NAME, "poweroff", timeout=30)
     time.sleep(3)
+    if r.returncode == 0:
+        usage.vm_shutdown()
     return r.returncode == 0
 
 
