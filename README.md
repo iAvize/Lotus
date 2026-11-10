@@ -48,12 +48,12 @@ Lotus checks GitHub Releases on launch. When a newer Windows beta zip is publish
 
 ## Here is the roadmap for future updates
 
-- iOS, Android, Mac, and Linux
+- iOS, Android, Mac, Linux, and app-store builds
 - Paid personal/enterprise tiers, quotas, and billing
 - Multi-AI fallback providers
 - VirtualBox/VM sandbox for untrusted code execution
 - Automatic GitHub pull requests or vulnerability rewrites
-- Plugins, remote dashboard, enterprise SSO/audit exports
+- Voice interface, plugins, remote dashboard, enterprise SSO/audit exports
 
 See `docs/ROADMAP.md` for the full backlog and reasons.
 

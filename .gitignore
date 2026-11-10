@@ -16,6 +16,7 @@ ENV/
 
 # Secrets and machine-local data
 config/api_keys.json
+config/devbox.json
 .env
 .env.*
 memory/
