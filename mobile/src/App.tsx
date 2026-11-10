@@ -107,7 +107,7 @@ export default function App() {
   if (showSettings) {
     return (
       <SafeAreaView style={styles.root}>
-        <StatusBar barStyle="light-content" backgroundColor={C.bg} />
+        <StatusBar barStyle="light-content" />
         <View style={styles.header}>
           <Text style={styles.title}>◆ LOTUS</Text>
         </View>
@@ -149,7 +149,7 @@ export default function App() {
 
   return (
     <SafeAreaView style={styles.root}>
-      <StatusBar barStyle="light-content" backgroundColor={C.bg} />
+      <StatusBar barStyle="light-content" />
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>◆ LOTUS</Text>
@@ -174,7 +174,7 @@ export default function App() {
           </Text>
         }
         ListFooterComponent={
-          thinking ? <Text style={styles.thinking}>Lotus is typing…</Text> : null
+          thinking ? <Text style={styles.thinking}>Lotus is typing…</Text> : undefined
         }
       />
 

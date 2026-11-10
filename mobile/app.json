@@ -15,6 +15,10 @@
     "android": {
       "package": "com.avize.lotus.beta",
       "versionCode": 1
-    }
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-status-bar"
+    ]
   }
 }
