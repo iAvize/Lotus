@@ -1,6 +1,10 @@
 """Build Windows beta and source zip artifacts for Lotus.
 
 Run from the repo root:  python scripts/build_beta_zip.py
+
+`Lotus Beta.zip` is the PUBLIC package — compiled app only, no source code
+or developer assets. Editable/developer content ships exclusively inside the
+AES-locked trusted-developers zip.
 """
 from __future__ import annotations
 
@@ -17,20 +21,6 @@ EXCLUDE_DIRS = {
 }
 EXCLUDE_FILES = {"api_keys.json", "devbox.json", ".env"}
 EXCLUDE_SUFFIXES = {".pyc", ".pyo", ".log"}
-
-APP_TOP_LEVEL = {
-    "lotus",
-    "Run-Lotus.bat",
-    "requirements.txt",
-    "README.md",
-    "LICENSE",
-    "version.json",
-}
-APP_SCRIPTS = {
-    "Run-Lotus.ps1",
-    "setup_windows.ps1",
-    "setup_windows.bat",
-}
 
 LAUNCHER_BAT = (
     "@echo off\r\n"
@@ -53,49 +43,42 @@ def excluded(path: Path) -> bool:
     return path.suffix.lower() in EXCLUDE_SUFFIXES
 
 
-def include_in_app(path: Path) -> bool:
-    rel = path.relative_to(ROOT)
-    if len(rel.parts) == 1:
-        return rel.parts[0] in APP_TOP_LEVEL
-    if rel.parts[0] == "lotus":
-        return True
-    if rel.parts[0] == "scripts":
-        return len(rel.parts) == 2 and rel.parts[1] in APP_SCRIPTS
-    return False
-
-
-def add_file(zf: zipfile.ZipFile, path: Path, arc_root: str) -> None:
-    arcname = Path(arc_root) / path.relative_to(ROOT)
-    zf.write(path, arcname.as_posix())
-
-
-def build(kind: str) -> Path:
+def build_app() -> Path:
+    """Public beta package: compiled app + docs only. No source code."""
     DIST.mkdir(exist_ok=True)
-    if kind == "app":
-        out = DIST / "Lotus Beta.zip"
-        arc_root = "Lotus Beta"
-        predicate = include_in_app
-        launcher = "Lotus Beta.bat"
-    else:
-        out = DIST / "Lotus Source.zip"
-        arc_root = "Lotus Source"
-        predicate = lambda path: not excluded(path)
-        launcher = "Lotus Source.bat"
+    out = DIST / "Lotus Beta.zip"
+    exe = ROOT.parent / "Lotus Beta" / "Lotus Beta.exe"
+    if not exe.is_file():
+        exe = DIST / "Lotus Beta.exe"
+    if not exe.is_file():
+        raise SystemExit("Lotus Beta.exe not found — build the PyInstaller exe first")
+    with zipfile.ZipFile(out, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.write(exe, "Lotus Beta/Lotus Beta.exe")
+        for name in ("version.json", "README.md", "LICENSE"):
+            src = ROOT / name
+            if src.is_file():
+                zf.write(src, f"Lotus Beta/{name}")
+    print(f"built {out.relative_to(ROOT)}")
+    return out
 
+
+def build_source() -> Path:
+    DIST.mkdir(exist_ok=True)
+    out = DIST / "Lotus Source.zip"
     with zipfile.ZipFile(out, "w", compression=zipfile.ZIP_DEFLATED) as zf:
         for path in sorted(ROOT.rglob("*")):
-            if not path.is_file() or excluded(path) or not predicate(path):
+            if not path.is_file() or excluded(path):
                 continue
-            add_file(zf, path, arc_root)
-        zf.writestr(f"{arc_root}/{launcher}", LAUNCHER_BAT)
-
+            arcname = Path("Lotus Source") / path.relative_to(ROOT)
+            zf.write(path, arcname.as_posix())
+        zf.writestr("Lotus Source/Lotus Source.bat", LAUNCHER_BAT)
     print(f"built {out.relative_to(ROOT)}")
     return out
 
 
 def main() -> None:
-    build("app")
-    build("source")
+    build_app()
+    build_source()
 
 
 if __name__ == "__main__":
