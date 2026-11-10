@@ -1,18 +1,17 @@
 # Lotus — Cybersecurity AI (Windows Beta)
 
-Lotus is a Windows-first cybersecurity assistant built for SOC analysis, AppSec, DevSecOps, secure coding, malware awareness, and general research/help. It is currently in **public beta**.
+Lotus is a Windows cybersecurity assistant built for SOC analysis, AppSec, DevSecOps, secure coding, malware awareness, and general research/help. It is currently in **public beta**.
 ## Beta features
 
 - Purple reactor + Matrix-rain desktop UI
 - Gemini-powered chat with local conversation memory
 - SQLite memory/request/activity logs (browsable in DB tools)
 - `remember:` / `forget` memory commands
-- Read-only OS info checks only after you approve the specific question
+- Read-only OS info checks
 - Folder virus scan with quarantine instead of deletion
 - Scan target dropdown for Downloads and detected local/external drives
 - GitHub repository code scan for risky patterns
 - GitHub release update check and Windows self-update staging
-- Local-only secrets in `config/api_keys.json` (never committed)
 
 ## Install on Windows
 
@@ -48,12 +47,12 @@ Lotus checks GitHub Releases on launch. When a newer Windows beta zip is publish
 
 ## Here is the roadmap for future updates
 
-- iOS, Android, Mac, Linux, and app-store builds
+- iOS, Android, Mac, and Linux
 - Paid personal/enterprise tiers, quotas, and billing
 - Multi-AI fallback providers
 - VirtualBox/VM sandbox for untrusted code execution
 - Automatic GitHub pull requests or vulnerability rewrites
-- Voice interface, plugins, remote dashboard, enterprise SSO/audit exports
+- Plugins, remote dashboard, enterprise SSO/audit exports
 
 See `docs/ROADMAP.md` for the full backlog and reasons.
 
