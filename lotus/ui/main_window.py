@@ -14,7 +14,7 @@ from PyQt6.QtCore import QEasingCurve, QPropertyAnimation, QStandardPaths, Qt, Q
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
     QApplication, QComboBox, QFrame, QHBoxLayout, QHeaderView, QLabel,
-    QLineEdit, QMainWindow, QMessageBox, QProgressDialog, QPushButton, QScrollBar, QStackedWidget, QTableWidget,
+    QLineEdit, QLabel, QMainWindow, QMessageBox, QProgressDialog, QPushButton, QScrollBar, QStackedWidget, QTableWidget,
     QTableWidgetItem, QTabWidget, QTextBrowser, QTextEdit, QVBoxLayout, QWidget,
 )
 
@@ -508,29 +508,36 @@ class MainWindow(QMainWindow):
         anim = getattr(self, "_fs_anim", None)
         if anim is not None and anim.state() == QPropertyAnimation.State.Running:
             return
-        # Crossfade through opacity instead of resizing: a geometry animation
-        # re-lays the whole window out every frame and smears text. Fading is
-        # what the eye reads as "smooth" and nothing can blur mid-transition.
-        self._fs_anim = self._fs_fade(1.0, 0.0, self._fs_flip)
-
-    def _fs_fade(self, start: float, end: float, done=None):
-        a = QPropertyAnimation(self, b"windowOpacity", self)
-        a.setDuration(190)
-        a.setStartValue(start)
-        a.setEndValue(end)
-        a.setEasingCurve(QEasingCurve.Type.InOutSine)
-        if done:
-            a.finished.connect(done)
-        a.start()
-        return a
-
-    def _fs_flip(self):
-        if self.isFullScreen():
-            self.showNormal()
-        else:
+        # Snapshot approach (how native apps do it): grab the window once,
+        # animate a borderless ghost image to the target rect while the real
+        # window flips state hidden underneath. The pixels never re-layout,
+        # so text stays crisp and the motion reads smooth.
+        entering = not self.isFullScreen()
+        target = (self.screen().geometry() if entering
+                  else getattr(self, "_saved_geom", None) or self.normalGeometry())
+        ghost = QLabel(None, Qt.WindowType.FramelessWindowHint
+                       | Qt.WindowType.WindowStaysOnTopHint)
+        ghost.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        ghost.setScaledContents(True)
+        ghost.setPixmap(self.grab())
+        ghost.setGeometry(self.geometry())
+        ghost.show()
+        if entering:
             self._saved_geom = self.geometry()
-            self.showFullScreen()
-        self._fs_anim = self._fs_fade(0.0, 1.0)
+            self.hide()
+            finish = self.showFullScreen
+        else:
+            self.showNormal()
+            self.hide()
+            finish = self.show
+        a = QPropertyAnimation(ghost, b"geometry", self)
+        a.setDuration(400)
+        a.setStartValue(ghost.geometry())
+        a.setEndValue(target)
+        a.setEasingCurve(QEasingCurve.Type.InOutCubic)
+        a.finished.connect(lambda: (finish(), QTimer.singleShot(0, ghost.close)))
+        a.start()
+        self._fs_anim = a
 
     def apply_theme(self, name: str):
         """Switch the accent palette instantly — widgets repaint on their own
