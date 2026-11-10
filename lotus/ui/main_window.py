@@ -389,24 +389,6 @@ class MainWindow(QMainWindow):
         target_choice_row.addWidget(refresh_targets)
         layout.addWidget(self.scan_target_choice_widget)
 
-        self.github_target = QLineEdit()
-        self.github_target.setPlaceholderText("github.com/owner/repo")
-        self.github_target.hide()
-        layout.addWidget(self.github_target)
-
-        scan_row = QHBoxLayout()
-        self.scan_button = QPushButton("Scan")
-        self.scan_button.clicked.connect(self._run_scan)
-        self.scan_details = QTextBrowser()
-        self.scan_details.setMinimumHeight(120)
-        scan_row.addWidget(self.scan_button)
-        scan_row.addWidget(self.scan_details, 1)
-        layout.addLayout(scan_row, 1)
-
-        self.scan_status = QLabel("no viruses detected")
-        self.scan_status.setObjectName("status")
-        layout.addWidget(self.scan_status)
-
         sched_row = QHBoxLayout()
         sched_row.addWidget(QLabel("Auto-scan:"))
         self.scan_schedule = QComboBox()
@@ -424,6 +406,24 @@ class MainWindow(QMainWindow):
         self._scan_timer = QTimer(self)
         self._scan_timer.timeout.connect(self._scan_tick)
         self._apply_scan_schedule(self.scan_schedule.currentIndex())
+
+        self.github_target = QLineEdit()
+        self.github_target.setPlaceholderText("github.com/owner/repo")
+        self.github_target.hide()
+        layout.addWidget(self.github_target)
+
+        scan_row = QHBoxLayout()
+        self.scan_button = QPushButton("Scan")
+        self.scan_button.clicked.connect(self._run_scan)
+        self.scan_details = QTextBrowser()
+        self.scan_details.setMinimumHeight(120)
+        scan_row.addWidget(self.scan_button)
+        scan_row.addWidget(self.scan_details, 1)
+        layout.addLayout(scan_row, 1)
+
+        self.scan_status = QLabel("no viruses detected")
+        self.scan_status.setObjectName("status")
+        layout.addWidget(self.scan_status)
         return page
 
     def _apply_scan_schedule(self, _i: int):
