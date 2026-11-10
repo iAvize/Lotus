@@ -70,7 +70,8 @@ def check_for_update(repo: str = REPO, timeout: int = 15) -> dict | None:
     }
 
 
-def download_update(info: dict, dest_dir: Path | None = None) -> Path:
+def download_update(info: dict, dest_dir: Path | None = None,
+                    progress=None) -> Path:
     asset = info.get("asset") or {}
     url = asset.get("browser_download_url") or asset.get("url")
     name = asset.get("name") or f"Lotus-{info.get('version', 'update')}-Windows.zip"
@@ -87,10 +88,15 @@ def download_update(info: dict, dest_dir: Path | None = None) -> Path:
 
     with requests.get(url, headers=headers, stream=True, timeout=60) as response:
         response.raise_for_status()
+        total = int(response.headers.get("Content-Length") or 0)
+        done = 0
         with dest.open("wb") as fh:
             for chunk in response.iter_content(chunk_size=1024 * 256):
                 if chunk:
                     fh.write(chunk)
+                    done += len(chunk)
+                    if progress:
+                        progress(done, total)
     return dest
 
 
@@ -103,8 +109,38 @@ def _zip_source_dir(zip_path: Path, extract_dir: Path) -> Path:
     return extract_dir
 
 
-def apply_update(zip_path: Path, app_dir: Path | None = None) -> Path:
-    """Stage an update and launch a helper batch that swaps files after exit."""
+def _launch_bat(bat: Path) -> None:
+    creationflags = 0
+    if hasattr(subprocess, "DETACHED_PROCESS"):
+        creationflags |= subprocess.DETACHED_PROCESS
+    if hasattr(subprocess, "CREATE_NEW_PROCESS_GROUP"):
+        creationflags |= subprocess.CREATE_NEW_PROCESS_GROUP
+    subprocess.Popen(["cmd.exe", "/c", str(bat)], cwd=str(bat.parent),
+                     creationflags=creationflags, close_fds=True)
+
+
+def pending_update(app_dir: Path | None = None) -> Path | None:
+    """The apply-batch a previous 'update on relaunch' left behind. Its mere
+    existence means an update is owed before the app may be used."""
+    app_dir = app_dir or config.BASE_DIR
+    bat = app_dir / "_apply_lotus_update.bat"
+    return bat if bat.exists() else None
+
+
+def run_pending(app_dir: Path | None = None) -> bool:
+    """Launch the staged apply-batch; caller must exit immediately after."""
+    bat = pending_update(app_dir)
+    if not bat:
+        return False
+    _launch_bat(bat)
+    return True
+
+
+def apply_update(zip_path: Path, app_dir: Path | None = None,
+                 launch: bool = True) -> Path:
+    """Stage an update and (optionally) launch the helper batch that swaps
+    files after exit. launch=False defers the swap to the next app start —
+    app.py checks pending_update() before showing any UI."""
     if sys.platform != "win32":
         raise RuntimeError("Self-update is currently implemented for Windows beta only.")
 
@@ -141,11 +177,6 @@ def apply_update(zip_path: Path, app_dir: Path | None = None) -> Path:
         encoding="utf-8",
     )
 
-    creationflags = 0
-    if hasattr(subprocess, "DETACHED_PROCESS"):
-        creationflags |= subprocess.DETACHED_PROCESS
-    if hasattr(subprocess, "CREATE_NEW_PROCESS_GROUP"):
-        creationflags |= subprocess.CREATE_NEW_PROCESS_GROUP
-    subprocess.Popen(["cmd.exe", "/c", str(bat)], cwd=str(app_dir),
-                     creationflags=creationflags, close_fds=True)
+    if launch:
+        _launch_bat(bat)
     return bat

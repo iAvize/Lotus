@@ -1,4 +1,4 @@
-"""Purple reactor and Matrix-rain visuals for Lotus."""
+"""Reactor and Matrix-rain visuals for Lotus — colored by the active theme."""
 from __future__ import annotations
 
 import math
@@ -6,6 +6,8 @@ import random
 from PyQt6.QtCore import QRectF, Qt, QTimer
 from PyQt6.QtGui import QColor, QFont, QPainter, QPen, QRadialGradient
 from PyQt6.QtWidgets import QWidget
+
+from . import theme
 
 
 MATRIX_CHARS = "アイウエオカキクケコサシスセソタチツテトナニヌネノ0123456789ABCDEF<>/\\{}[]#$%&"
@@ -39,7 +41,8 @@ class MatrixRain(QWidget):
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, False)
-        painter.fillRect(self.rect(), QColor(8, 5, 18))
+        pal = theme.current()
+        painter.fillRect(self.rect(), QColor(pal["window"]))
 
         font = QFont("Consolas", 11)
         painter.setFont(font)
@@ -49,6 +52,7 @@ class MatrixRain(QWidget):
         if len(self._drops) < cols:
             self._drops.extend([random.randint(-30, 0) for _ in range(cols - len(self._drops))])
 
+        base = QColor(pal["rain"])
         for col in range(cols):
             x = col * char_w
             head = self._drops[col] if col < len(self._drops) else 0
@@ -58,7 +62,8 @@ class MatrixRain(QWidget):
                     continue
                 ch = MATRIX_CHARS[(col * 13 + self._frame + j * 7) % len(MATRIX_CHARS)]
                 alpha = 230 if j == 0 else max(20, 220 - j * 32)
-                color = QColor(168, 85, 247, alpha)
+                color = QColor(base)
+                color.setAlpha(alpha)
                 painter.setPen(color)
                 painter.drawText(x, y, ch)
         painter.end()
@@ -85,19 +90,23 @@ class ReactorWidget(QWidget):
         h = self.height()
         center = QRectF(0, 0, w, h).center()
 
+        pal = theme.current()
         glow = QRadialGradient(center, w * 0.48)
-        glow.setColorAt(0.0, QColor(139, 92, 246, 70))
-        glow.setColorAt(0.45, QColor(88, 28, 135, 45))
-        glow.setColorAt(1.0, QColor(8, 5, 18, 0))
+        c = QColor(pal["glow1"]); c.setAlpha(70)
+        glow.setColorAt(0.0, c)
+        c = QColor(pal["glow2"]); c.setAlpha(45)
+        glow.setColorAt(0.45, c)
+        c = QColor(pal["window"]); c.setAlpha(0)
+        glow.setColorAt(1.0, c)
         painter.setBrush(glow)
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawEllipse(QRectF(center.x() - w * 0.48, center.y() - w * 0.48, w * 0.96, w * 0.96))
 
         rings = [
-            (0.46, 8, 26, 120, QColor(168, 85, 247)),
-            (0.40, 5, -18, 90, QColor(196, 141, 255)),
-            (0.34, 12, 14, 70, QColor(124, 58, 237)),
-            (0.28, 7, -32, 140, QColor(216, 180, 254)),
+            (0.46, 8, 26, 120, QColor(pal["ring1"])),
+            (0.40, 5, -18, 90, QColor(pal["ring2"])),
+            (0.34, 12, 14, 70, QColor(pal["ring3"])),
+            (0.28, 7, -32, 140, QColor(pal["ring4"])),
         ]
         for radius_frac, width, speed, span, color in rings:
             radius = w * radius_frac
@@ -111,9 +120,12 @@ class ReactorWidget(QWidget):
         core_rect = QRectF(center.x() - core_radius, center.y() - core_radius,
                            core_radius * 2, core_radius * 2)
         core_grad = QRadialGradient(core_rect.center(), core_radius)
-        core_grad.setColorAt(0.0, QColor(233, 213, 255, 235))
-        core_grad.setColorAt(0.55, QColor(168, 85, 247, 210))
-        core_grad.setColorAt(1.0, QColor(76, 29, 149, 180))
+        c = QColor(pal["core1"]); c.setAlpha(235)
+        core_grad.setColorAt(0.0, c)
+        c = QColor(pal["core2"]); c.setAlpha(210)
+        core_grad.setColorAt(0.55, c)
+        c = QColor(pal["core3"]); c.setAlpha(180)
+        core_grad.setColorAt(1.0, c)
         painter.setBrush(core_grad)
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawEllipse(core_rect)

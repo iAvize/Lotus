@@ -10,17 +10,17 @@ import threading
 from pathlib import Path
 
 import psutil
-from PyQt6.QtCore import QStandardPaths, Qt, QTimer
+from PyQt6.QtCore import QStandardPaths, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
     QApplication, QComboBox, QFrame, QHBoxLayout, QHeaderView, QLabel,
-    QLineEdit, QMainWindow, QMessageBox, QPushButton, QScrollBar, QStackedWidget, QTableWidget,
+    QLineEdit, QMainWindow, QMessageBox, QProgressDialog, QPushButton, QScrollBar, QStackedWidget, QTableWidget,
     QTableWidgetItem, QTabWidget, QTextBrowser, QTextEdit, QVBoxLayout, QWidget,
 )
 
-from .. import ai, config, db, github, platform_info, scanner, updater
+from .. import __version__, ai, config, db, devbox, github, platform_info, scanner, updater
+from . import theme
 from .settings_dialog import SettingsDialog
-from .theme import APP_STYLESHEET
 from .widgets import MatrixRain, ReactorWidget
 
 
@@ -48,6 +48,31 @@ class DragBar(QFrame):
         super().mouseDoubleClickEvent(event)
 
 
+class ChatInput(QTextEdit):
+    """Multi-line ask box that grows with what you type — Enter sends,
+    Shift+Enter inserts a newline, tall messages get a scrollbar."""
+    submitted = pyqtSignal()
+    _MIN_H, _MAX_H = 40, 170
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAcceptRichText(False)
+        self.setPlaceholderText("Ask a question…  (Enter to send — Shift+Enter for a new line)")
+        self.textChanged.connect(self._fit_to_content)
+        self._fit_to_content()
+
+    def _fit_to_content(self):
+        doc_h = self.document().size().height()
+        self.setFixedHeight(int(max(self._MIN_H, min(doc_h + 18, self._MAX_H))))
+
+    def keyPressEvent(self, event):
+        if (event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter)
+                and not event.modifiers() & Qt.KeyboardModifier.ShiftModifier):
+            self.submitted.emit()
+            return
+        super().keyPressEvent(event)
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -55,7 +80,7 @@ class MainWindow(QMainWindow):
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
         self.resize(1360, 800)
         self.setMinimumSize(1120, 720)
-        self.setStyleSheet(APP_STYLESHEET)
+        self.setStyleSheet(theme.stylesheet(config.get_setting("ui_theme") or theme.DEFAULT_THEME))
         icon_path = Path(__file__).resolve().parents[1] / "assets" / "lotus.ico"
         if icon_path.exists():
             self.setWindowIcon(QIcon(str(icon_path)))
@@ -74,6 +99,7 @@ class MainWindow(QMainWindow):
         self.refresh_logs()
         self.refresh_memories()
         QTimer.singleShot(800, self._check_update)
+        QTimer.singleShot(1200, self.refresh_devbox)
 
     def _ensure_desktop_shortcut(self):
         if sys.platform != "win32" or not getattr(sys, "frozen", False):
@@ -175,6 +201,7 @@ class MainWindow(QMainWindow):
 
         self.update_button = QPushButton("Update")
         self.update_button.setEnabled(False)
+        self.update_button.setVisible(False)  # only exists while an update is available
         self.update_button.clicked.connect(self._on_update_clicked)
         header_layout.addWidget(self.update_button)
 
@@ -186,6 +213,11 @@ class MainWindow(QMainWindow):
         minimize.setFixedWidth(42)
         minimize.clicked.connect(self.showMinimized)
         header_layout.addWidget(minimize)
+        full = QPushButton("⛶")
+        full.setFixedWidth(42)
+        full.setToolTip("Full screen")
+        full.clicked.connect(self._toggle_fullscreen)
+        header_layout.addWidget(full)
         close = QPushButton("×")
         close.setFixedWidth(42)
         close.clicked.connect(self.close)
@@ -228,6 +260,7 @@ class MainWindow(QMainWindow):
         self._register_section("ask", "Ask Lotus", self._build_ask_page(), nav_layout)
         self._register_section("logs", "Logs / Memory", self._build_logs_page(), nav_layout)
         self._register_section("scan", "File / Repo Scan", self._build_scan_page(), nav_layout)
+        self._register_section("devbox", "Devbox", self._build_devbox_page(), nav_layout)
         nav_layout.addStretch(1)
 
         layout.addWidget(nav)
@@ -272,14 +305,13 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.thinking_label)
 
         ask_row = QHBoxLayout()
-        self.ask_input = QLineEdit()
-        self.ask_input.setPlaceholderText("Ask a question…")
-        self.ask_input.returnPressed.connect(self._send_question)
+        self.ask_input = ChatInput()
+        self.ask_input.submitted.connect(self._send_question)
         send = QPushButton("Send")
         send.setObjectName("sendButton")
         send.clicked.connect(self._send_question)
         ask_row.addWidget(self.ask_input, 1)
-        ask_row.addWidget(send)
+        ask_row.addWidget(send, 0, Qt.AlignmentFlag.AlignBottom)
         layout.addLayout(ask_row)
         return page
 
@@ -352,6 +384,35 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.scan_status)
         return page
 
+    def _build_devbox_page(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(8)
+
+        self.devbox_status = QTextBrowser()
+        self.devbox_status.setMaximumHeight(150)
+        self.devbox_status.setHtml("<i>Refresh to check the Lotus-Lab VM.</i>")
+        layout.addWidget(self.devbox_status)
+
+        buttons = QHBoxLayout()
+        for label, fn in (
+            ("Refresh", self.refresh_devbox),
+            ("Boot VM", lambda: self._devbox_action(devbox.ensure_running)),
+            ("Sync source", lambda: self._devbox_action(devbox.sync)),
+            ("Run checks", lambda: self._devbox_action(devbox.test)),
+            ("Revert to clean", lambda: self._devbox_action(devbox.revert)),
+        ):
+            b = QPushButton(label)
+            b.clicked.connect(lambda checked=False, f=fn: f())
+            buttons.addWidget(b)
+        buttons.addStretch(1)
+        layout.addLayout(buttons)
+
+        self.experiments_table = self._make_table(["Time", "Kind", "Result", "Secs", "Goal"])
+        layout.addWidget(self.experiments_table, 1)
+        return page
+
     def _make_table(self, columns: list[str]) -> QTableWidget:
         table = QTableWidget(0, len(columns))
         table.setHorizontalHeaderLabels(columns)
@@ -360,6 +421,61 @@ class MainWindow(QMainWindow):
         table.verticalHeader().setVisible(False)
         table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         return table
+
+    # ── Devbox (Lotus-Lab VM) ───────────────────────────────────────────────
+    def refresh_devbox(self):
+        self._run_bg(
+            devbox.status,
+            on_ok=self._on_devbox_status,
+            on_err=lambda exc: self.devbox_status.setHtml(
+                f"<span style='color:#fda4af'>{html.escape(str(exc))}</span>"),
+        )
+        self._refresh_experiments()
+
+    def _on_devbox_status(self, st: dict):
+        state = html.escape(str(st.get("vm_state", "?")))
+        color = "#86efac" if st.get("vm_state") == "running" else "#f0abfc"
+        lines = [
+            f"<b>{html.escape(str(st.get('vm', 'Lotus-Lab')))}</b> — "
+            f"<span style='color:{color}'>{state}</span><br>",
+            f"VirtualBox: {'yes' if st.get('virtualbox') else '<b>not found</b>'} · "
+            f"credentials: {'saved' if st.get('configured') else '<b>missing</b>'}<br>",
+            f"staging: {html.escape(str(st.get('staging', '')))} "
+            f"({st.get('staged_files', 0)} files)<br>",
+            f"<span style='color:#9f8bd0'>Ask Lotus to work in the devbox: “edit your code”/"
+            f"“sandbox test” — it edits staging, tests in the VM, then promotes.</span>",
+        ]
+        self.devbox_status.setHtml("".join(lines))
+
+    def _devbox_action(self, fn):
+        self.devbox_status.setHtml("<i>working…</i>")
+        self._run_bg(
+            fn,
+            on_ok=lambda res: (self.refresh_devbox(),
+                               db.log("info", "devbox", str(res)[:300])),
+            on_err=lambda exc: (self.refresh_devbox(),
+                                db.log("error", "devbox", str(exc)[:300])),
+        )
+
+    def _refresh_experiments(self):
+        try:
+            rows = db.recent_experiments(100)
+        except Exception:
+            return
+        self.experiments_table.setRowCount(len(rows))
+        for i, row in enumerate(rows):
+            created = str(row.get("created", ""))
+            stamp = created[11:19] if len(created) >= 19 else created
+            values = [
+                stamp,
+                row.get("kind", ""),
+                "ok" if row.get("ok") else "failed",
+                f"{float(row.get('duration_s') or 0):.0f}",
+                str(row.get("goal", ""))[:200],
+            ]
+            for col, value in enumerate(values):
+                self.experiments_table.setItem(i, col, QTableWidgetItem(str(value)))
+        self.experiments_table.scrollToBottom()
 
     def _build_center(self) -> QWidget:
         center = QWidget()
@@ -381,7 +497,24 @@ class MainWindow(QMainWindow):
         hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(hint)
         layout.addStretch(2)
+
+        ver = QLabel(f"v{__version__}")
+        ver.setObjectName("version")
+        ver.setAlignment(Qt.AlignmentFlag.AlignRight)
+        layout.addWidget(ver)
         return center
+
+    def _toggle_fullscreen(self):
+        if self.isFullScreen():
+            self.showNormal()
+        else:
+            self.showFullScreen()
+
+    def apply_theme(self, name: str):
+        """Switch the accent palette instantly — widgets repaint on their own
+        timers, so the whole app recolors in well under a second."""
+        config.save_setting("ui_theme", name)
+        self.setStyleSheet(theme.stylesheet(name))
 
     # ── Dragging ────────────────────────────────────────────────────────────
     def _begin_drag(self, pos):
@@ -397,8 +530,9 @@ class MainWindow(QMainWindow):
     # ── Chat ────────────────────────────────────────────────────────────────
     def _append_chat(self, who: str, text: str, css_class: str = ""):
         safe = html.escape(text).replace("\n", "<br>")
+        accent = html.escape(theme.current()["section"])
         self.chat_view.append(
-            f"<div class='msg {css_class}' style='margin:8px 0;'><b style='color:#c4b5fd'>{html.escape(who)}:</b><br>{safe}</div>"
+            f"<div class='msg {css_class}' style='margin:8px 0;'><b style='color:{accent}'>{html.escape(who)}:</b><br>{safe}</div>"
         )
         bar = self.chat_view.verticalScrollBar()
         bar.setValue(bar.maximum())
@@ -407,7 +541,7 @@ class MainWindow(QMainWindow):
         self.center_status.setText(text)
 
     def _send_question(self):
-        text = self.ask_input.text().strip()
+        text = self.ask_input.toPlainText().strip()
         if not text:
             return
         self.ask_input.clear()
@@ -661,46 +795,114 @@ class MainWindow(QMainWindow):
         self._update_info = info
         if info:
             self.update_button.setEnabled(True)
+            self.update_button.setVisible(True)
             self.update_button.setText(f"Update {info.get('version', '')}")
             self.update_button.setToolTip(f"Lotus {info.get('version', '')} is available")
             db.log("info", "updater", f"update available: {info.get('version')}")
         else:
+            self.update_button.setVisible(False)
             self.update_button.setEnabled(False)
-            self.update_button.setText("Up to date")
 
     def _on_update_clicked(self):
         info = self._update_info
         if not info:
             return
         body = (info.get("body") or "")[:1200]
-        answer = QMessageBox.question(
-            self,
-            f"Update Lotus to {info.get('version', '')}?",
-            f"{body}\n\nLotus will download the Windows beta zip and restart to finish updating.",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.Yes,
+        box = QMessageBox(self)
+        box.setWindowTitle(f"Update Lotus to {info.get('version', '')}?")
+        box.setText(
+            f"{body}\n\n"
+            "Update and restart — install now, Lotus relaunches when done.\n"
+            "Update on relaunch — keep using Lotus; it installs automatically "
+            "next time you open it."
         )
-        if answer != QMessageBox.StandardButton.Yes:
-            return
+        restart_btn = box.addButton("Update and restart", QMessageBox.ButtonRole.AcceptRole)
+        later_btn = box.addButton("Update on relaunch", QMessageBox.ButtonRole.ActionRole)
+        box.addButton(QMessageBox.StandardButton.Cancel)
+        box.exec()
+        clicked = box.clickedButton()
+        if clicked is restart_btn:
+            self._start_update_download(restart=True)
+        elif clicked is later_btn:
+            self._start_update_download(restart=False)
 
-        def perform_update():
-            zip_path = updater.download_update(info)
-            updater.apply_update(zip_path)
+    def _start_update_download(self, restart: bool):
+        info = self._update_info
+        self.update_button.setEnabled(False)
+        self._dl_state = {"done": 0, "total": 0, "cancel": False}
+        version = str(info.get("version", ""))
+        self._dl_dialog = QProgressDialog(
+            f"Downloading Lotus {version}…", "Cancel", 0, 100, self)
+        self._dl_dialog.setWindowTitle("Lotus update")
+        self._dl_dialog.setWindowModality(Qt.WindowModality.WindowModal)
+        self._dl_dialog.setMinimumDuration(0)
+        self._dl_dialog.setAutoClose(False)
+        self._dl_dialog.canceled.connect(self._cancel_download)
+        self._dl_dialog.show()
+        self._dl_restart = restart
+        self._dl_timer = QTimer(self)
+        self._dl_timer.timeout.connect(self._poll_download)
+        self._dl_timer.start(80)
+
+        def work():
+            def progress(done: int, total: int):
+                if self._dl_state["cancel"]:
+                    raise RuntimeError("Download cancelled.")
+                self._dl_state["done"], self._dl_state["total"] = done, total
+            zip_path = updater.download_update(info, progress=progress)
+            updater.apply_update(zip_path, launch=restart)
             return zip_path
 
-        self.update_button.setEnabled(False)
-        self.update_button.setText("Updating…")
-        self._run_bg(
-            perform_update,
-            on_ok=lambda _path: self._finish_update(),
-            on_err=self._on_update_error,
-        )
+        self._run_bg(work, on_ok=self._on_download_done, on_err=self._on_update_error)
 
-    def _finish_update(self):
-        QMessageBox.information(self, "Lotus update", "Update downloaded and staged. Lotus will now restart.")
-        QApplication.quit()
+    def _poll_download(self):
+        state = getattr(self, "_dl_state", None)
+        dlg = getattr(self, "_dl_dialog", None)
+        if not state or not dlg:
+            return
+        total, done = state["total"], state["done"]
+        version = str((self._update_info or {}).get("version", ""))
+        if total:
+            dlg.setMaximum(100)
+            dlg.setValue(int(done * 100 / total))
+            dlg.setLabelText(
+                f"Downloading Lotus {version}… "
+                f"{done / 1048576:.1f} / {total / 1048576:.1f} MB")
+        else:
+            dlg.setMaximum(0)
+            dlg.setLabelText(f"Downloading Lotus {version}… {done / 1048576:.1f} MB")
+
+    def _cancel_download(self):
+        if getattr(self, "_dl_state", None):
+            self._dl_state["cancel"] = True
+
+    def _close_download_ui(self):
+        timer = getattr(self, "_dl_timer", None)
+        if timer:
+            timer.stop()
+        dlg = getattr(self, "_dl_dialog", None)
+        if dlg:
+            dlg.close()
+
+    def _on_download_done(self, _zip_path):
+        self._close_download_ui()
+        version = str((self._update_info or {}).get("version", ""))
+        if self._dl_restart:
+            QMessageBox.information(
+                self, "Lotus update",
+                "Update downloaded — Lotus will restart now to apply it.")
+            QApplication.quit()
+        else:
+            QMessageBox.information(
+                self, "Lotus update",
+                f"Lotus {version} will install automatically next time you open it. "
+                "The app must update before it can be used again.")
+            self.update_button.setEnabled(True)
 
     def _on_update_error(self, exc: Exception):
+        self._close_download_ui()
         self.update_button.setEnabled(True)
-        self.update_button.setText("Update failed")
+        if str(exc) == "Download cancelled.":
+            db.log("info", "updater", "update download cancelled by user")
+            return
         self._show_error(exc)

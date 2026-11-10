@@ -15,12 +15,11 @@ EXCLUDE_DIRS = {
     ".git", "memory", "config", "dist", ".venv", "venv", "env", "node_modules",
     "__pycache__", "_lotus_update_staging", ".idea", ".vscode",
 }
-EXCLUDE_FILES = {"api_keys.json", ".env"}
+EXCLUDE_FILES = {"api_keys.json", "devbox.json", ".env"}
 EXCLUDE_SUFFIXES = {".pyc", ".pyo", ".log"}
 
 APP_TOP_LEVEL = {
     "lotus",
-    "run_lotus.py",
     "Run-Lotus.bat",
     "requirements.txt",
     "README.md",

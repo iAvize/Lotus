@@ -39,6 +39,37 @@ _SEARCH_HINTS = (
     "who is", "what happened",
 )
 
+_DEV_HINTS = (
+    "sandbox", "devbox", "lotus-lab", "staging", "workbench",
+    "edit your", "change your", "rewrite", "refactor", "modify your",
+    "your code", "your source", "improve yourself", "self-improve", "self improve",
+    "test your", "experiment", "patch yourself", "fix yourself",
+    "learn from", "teach yourself", "update your code",
+)
+
+_DEVBOX_PROMPT = """
+
+You have a private VirtualBox lab VM ("Lotus-Lab") and a staging copy of your
+own source code. The devbox_* / staging_* tools are real — their results are
+the only truth about what happened.
+
+Workflow for code changes:
+1. devbox_sync to refresh staging from the official source.
+2. read_official_file / staging_read_file to see current code; staging_write_file
+   to make your edits (staging only — never the official source, never config/
+   or memory/).
+3. devbox_test to run the in-guest checks; devbox_run for extra commands
+   (python, pip, scripts) inside the VM at C:\\lotus-staging. Guest Python is
+   3.12 at C:\\python312\\python.exe and is on PATH as plain `python`/`pip`.
+4. Only when checks pass, promote_changes to apply staging to the official
+   source. Explain what changed and why.
+5. Always finish a dev session with record_lesson: one line on what worked,
+   what failed, or what to do differently next time.
+
+Be iterative: if a check fails, read the output, fix the staging file, and
+test again — that loop is how you improve. If the lab is not ready, say so and
+suggest: python -m lotus.devbox boot."""
+
 
 def _now() -> str:
     return datetime.now().isoformat(timespec="seconds")
@@ -79,6 +110,11 @@ def wants_search(text: str) -> bool:
     return any(hint in lower for hint in _SEARCH_HINTS)
 
 
+def wants_devbox(text: str) -> bool:
+    lower = text.lower()
+    return any(hint in lower for hint in _DEV_HINTS)
+
+
 def _client(api_key: str, timeout_ms: int):
     from google import genai
     from google.genai import types
@@ -103,7 +139,7 @@ def _response_text(response) -> str:
         return ""
 
 
-def _generate(prompt: str, *, use_search: bool = False,
+def _generate(prompt: str, *, use_search: bool = False, use_devbox: bool = False,
               timeout_ms: int = 45_000) -> tuple[str, str]:
     api_key = config.get_gemini_key()
     if not api_key:
@@ -114,13 +150,19 @@ def _generate(prompt: str, *, use_search: bool = False,
     system += f"\n\nCurrent local time: {_now()}"
     if memories:
         system += f"\n\nKnown memories/preferences:\n{memories}"
+    if use_devbox:
+        system += _DEVBOX_PROMPT
 
     cfg = {
         "system_instruction": system,
         "temperature": 0.7,
         "max_output_tokens": 2048,
     }
-    if use_search:
+    if use_devbox:
+        from . import devbox
+        cfg["tools"] = list(devbox.DEVBOX_TOOLS)
+        cfg["automatic_function_calling"] = {"maximum_remote_calls": 15}
+    elif use_search:
         cfg["tools"] = [{"google_search": {}}]
 
     client = _client(api_key, timeout_ms)
@@ -198,11 +240,13 @@ def ask(user_text: str) -> str:
     transcript_lines.append("Lotus:")
     prompt = "\n".join(transcript_lines)
 
-    use_search = wants_search(user_text)
+    use_devbox = wants_devbox(user_text)
+    use_search = wants_search(user_text) and not use_devbox
     answer = ""
     model = ""
     try:
-        answer, model = _generate(prompt, use_search=use_search, timeout_ms=60_000)
+        answer, model = _generate(prompt, use_search=use_search, use_devbox=use_devbox,
+                                  timeout_ms=120_000 if use_devbox else 60_000)
     except Exception as exc:
         if use_search:
             db.log("warning", "ai", f"Gemini search failed, trying DDG fallback: {exc}")

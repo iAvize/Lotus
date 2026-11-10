@@ -61,13 +61,24 @@ CREATE TABLE IF NOT EXISTS settings (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL DEFAULT ''
 );
+CREATE TABLE IF NOT EXISTS experiments (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    created    TEXT NOT NULL,
+    kind       TEXT NOT NULL,
+    goal       TEXT NOT NULL DEFAULT '',
+    detail     TEXT NOT NULL DEFAULT '{}',
+    ok         INTEGER NOT NULL DEFAULT 0,
+    duration_s REAL NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS experiments_created ON experiments(created DESC);
 """
 
 _SEED_MEMORIES = (
     ("profile", "name", "Lotus"),
     ("profile", "role", "Cybersecurity AI assistant focused on SOC analysis, AppSec, DevSecOps, defense, and safe automation."),
     ("notes", "mission", "Prioritize cybersecurity tasks while remaining useful for research, writing, coding, testing, and maintenance."),
-    ("notes", "beta_scope", "Windows-first beta. App stores, mobile apps, billing, multi-AI fallback, and VM sandboxing are roadmap items, not beta features."),
+    ("notes", "beta_scope", "Windows-first beta. App stores, mobile apps, billing, and multi-AI fallback are roadmap items, not beta features."),
+    ("profile", "devbox", "Has its own VirtualBox lab VM (Lotus-Lab): edits a staging copy of its source, tests inside the VM, and promotes only after in-guest checks pass."),
 )
 
 
@@ -86,6 +97,12 @@ def _conn() -> sqlite3.Connection:
             "VALUES(?,?,?, '', 0, '')",
             (category, key, value),
         )
+    conn.execute(
+        "UPDATE memories SET value=? WHERE category='notes' AND key='beta_scope' "
+        "AND value LIKE '%VM sandboxing%'",
+        ("Windows-first beta. App stores, mobile apps, billing, and multi-AI fallback "
+         "are roadmap items, not beta features.",),
+    )
     conn.commit()
     return conn
 
@@ -187,7 +204,7 @@ def list_memories(include_deleted: bool = False, limit: int = 500) -> list[dict]
 
 def memory_context(max_chars: int = 5000) -> str:
     rows = [r for r in list_memories(limit=300)
-            if r["category"] in {"profile", "preferences", "user_facts", "notes"}]
+            if r["category"] in {"profile", "preferences", "user_facts", "notes", "lessons"}]
     lines = []
     total = 0
     for row in rows:
@@ -197,6 +214,36 @@ def memory_context(max_chars: int = 5000) -> str:
         lines.append(line)
         total += len(line) + 1
     return "\n".join(lines)
+
+
+def add_lesson(lesson: str) -> None:
+    """Store a lesson learned from a dev session. Lessons surface in every
+    future prompt via memory_context — this is how Lotus improves itself."""
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    add_memory("lessons", f"lesson-{stamp}", str(lesson)[:1000])
+
+
+def record_experiment(kind: str, goal: str, detail: dict, ok: bool,
+                      duration_s: float = 0.0) -> None:
+    with _lock, _conn() as conn:
+        conn.execute(
+            "INSERT INTO experiments(created, kind, goal, detail, ok, duration_s) "
+            "VALUES(?,?,?,?,?,?)",
+            (_now(), str(kind), str(goal)[:500],
+             json.dumps(detail, ensure_ascii=False)[:30000],
+             1 if ok else 0, float(duration_s or 0)),
+        )
+        conn.commit()
+
+
+def recent_experiments(limit: int = 100) -> list[dict]:
+    with _lock, _conn() as conn:
+        rows = conn.execute(
+            "SELECT id, created, kind, goal, ok, duration_s, detail FROM experiments "
+            "ORDER BY id DESC LIMIT ?",
+            (int(limit),),
+        ).fetchall()
+    return [dict(r) for r in rows]
 
 
 def get_setting(key: str, default: str = "") -> str:

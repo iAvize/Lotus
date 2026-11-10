@@ -1,12 +1,13 @@
-"""Settings dialog for Lotus secrets and integration tokens."""
+"""Settings dialog for Lotus secrets, appearance, and integrations."""
 from __future__ import annotations
 
 from PyQt6.QtWidgets import (
-    QDialog, QDialogButtonBox, QHBoxLayout, QLabel, QLineEdit, QMessageBox,
-    QPushButton, QVBoxLayout,
+    QCheckBox, QDialog, QDialogButtonBox, QHBoxLayout, QLabel, QLineEdit,
+    QMessageBox, QPushButton, QVBoxLayout,
 )
 
-from .. import ai, config, db
+from .. import ai, config, db, startup
+from . import theme
 
 
 class SettingsDialog(QDialog):
@@ -42,9 +43,27 @@ class SettingsDialog(QDialog):
         self.github_edit.setPlaceholderText("Stored locally — enter a new token to replace it")
         layout.addWidget(self.github_edit)
 
+        layout.addWidget(QLabel("Theme — applies instantly"))
+        theme_row = QHBoxLayout()
+        for name in theme.THEME_NAMES:
+            pal = theme.PALETTES[name]
+            b = QPushButton(name.title())
+            b.setStyleSheet(
+                f"background: {pal['accent']}; color: #ffffff; "
+                f"border: 1px solid {pal['accent_light']};")
+            b.clicked.connect(lambda checked=False, n=name: self._pick_theme(n))
+            theme_row.addWidget(b)
+        theme_row.addStretch(1)
+        layout.addLayout(theme_row)
+
+        self.startup_check = QCheckBox("Run Lotus automatically when Windows starts")
+        self.startup_check.setChecked(startup.is_enabled())
+        self.startup_check.toggled.connect(self._toggle_startup)
+        layout.addWidget(self.startup_check)
+
         self.status = QLabel("")
         self.status.setWordWrap(True)
-        self.status.setStyleSheet("color: #a78bfa;")
+        self.status.setStyleSheet(f"color: {theme.current()['accent_light']};")
         layout.addWidget(self.status)
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Close)
@@ -52,6 +71,25 @@ class SettingsDialog(QDialog):
         buttons.accepted.connect(self._save)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
+
+    def _pick_theme(self, name: str):
+        window = self.parent()
+        if hasattr(window, "apply_theme"):
+            window.apply_theme(name)
+        self.status.setText(f"Theme: {name}")
+        self.status.setStyleSheet(f"color: {theme.current()['accent_light']};")
+        db.log("info", "settings", f"theme switched to {name}")
+
+    def _toggle_startup(self, checked: bool):
+        if startup.set_enabled(checked):
+            self.status.setText(
+                "Lotus will start with Windows." if checked
+                else "Lotus will no longer start with Windows.")
+        else:
+            self.status.setText("Could not update the Windows startup entry.")
+            self.startup_check.blockSignals(True)
+            self.startup_check.setChecked(startup.is_enabled())
+            self.startup_check.blockSignals(False)
 
     def _import_jarvis(self):
         for path in config.jarvis_config_candidates():
