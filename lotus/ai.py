@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 from datetime import datetime
 
-from . import config, db
+from . import config, db, personality
 
 MODEL_LADDER = (
     "gemini-3.5-flash-lite",
@@ -150,6 +150,7 @@ def _generate(prompt: str, *, use_search: bool = False, use_devbox: bool = False
     system += f"\n\nCurrent local time: {_now()}"
     if memories:
         system += f"\n\nKnown memories/preferences:\n{memories}"
+    system += f"\n\n{personality.prompt_block()}"
     if use_devbox:
         system += _DEVBOX_PROMPT
 
@@ -202,6 +203,7 @@ def _generate_stream(prompt: str, on_chunk, timeout_ms: int = 45_000) -> tuple[s
     system = SYSTEM_PROMPT + f"\n\nCurrent local time: {_now()}"
     if memories:
         system += f"\n\nKnown memories/preferences:\n{memories}"
+    system += f"\n\n{personality.prompt_block()}"
     cfg = {"system_instruction": system, "temperature": 0.7, "max_output_tokens": 2048}
     client = _client(api_key, timeout_ms)
     errors: list[str] = []
@@ -296,6 +298,11 @@ def ask(user_text: str) -> str:
     db.add_message("assistant", answer)
     db.remember_request(user_text, answer, model=model, used_search=use_search)
     db.log("info", "chat", f"response from {model or 'unknown'}")
+    try:
+        if personality.note_message():
+            personality.synthesize()
+    except Exception:
+        pass
     return answer
 
 
@@ -351,4 +358,9 @@ def ask_stream(user_text: str, on_chunk) -> str:
     db.add_message("assistant", answer)
     db.remember_request(user_text, answer, model=model, used_search=use_search)
     db.log("info", "chat", f"response from {model or 'unknown'}")
+    try:
+        if personality.note_message():
+            personality.synthesize()
+    except Exception:
+        pass
     return answer

@@ -14,11 +14,11 @@ from PyQt6.QtCore import QEasingCurve, QPropertyAnimation, QStandardPaths, Qt, Q
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
     QApplication, QComboBox, QFrame, QHBoxLayout, QHeaderView, QLabel,
-    QLineEdit, QLabel, QMainWindow, QMessageBox, QProgressDialog, QPushButton, QScrollBar, QStackedWidget, QTableWidget,
+    QLineEdit, QLabel, QMainWindow, QMessageBox, QProgressDialog, QPushButton, QScrollBar, QSlider, QStackedWidget, QTableWidget,
     QTableWidgetItem, QTabWidget, QTextBrowser, QTextEdit, QVBoxLayout, QWidget,
 )
 
-from .. import __version__, ai, config, db, devbox, github, platform_info, scanner, updater
+from .. import __version__, ai, config, db, devbox, github, personality, platform_info, scanner, updater
 from . import theme
 from .settings_dialog import SettingsDialog
 from .widgets import MatrixRain, ReactorWidget
@@ -284,6 +284,7 @@ class MainWindow(QMainWindow):
         self._register_section("logs", "Logs / Memory", self._build_logs_page(), nav_layout)
         self._register_section("scan", "File / Repo Scan", self._build_scan_page(), nav_layout)
         self._register_section("devbox", "Devbox", self._build_devbox_page(), nav_layout)
+        self._register_section("personality", "Personality", self._build_personality_page(), nav_layout)
         nav_layout.addStretch(1)
 
         layout.addWidget(nav)
@@ -405,7 +406,38 @@ class MainWindow(QMainWindow):
         self.scan_status = QLabel("no viruses detected")
         self.scan_status.setObjectName("status")
         layout.addWidget(self.scan_status)
+
+        sched_row = QHBoxLayout()
+        sched_row.addWidget(QLabel("Auto-scan:"))
+        self.scan_schedule = QComboBox()
+        for label, mins in (("Off", 0), ("Every 30 minutes", 30),
+                            ("Every hour", 60), ("Every 2 hours", 120)):
+            self.scan_schedule.addItem(label, mins)
+        saved = int(db.get_setting("scan_interval_min", "0") or 0)
+        for i in range(self.scan_schedule.count()):
+            if self.scan_schedule.itemData(i) == saved:
+                self.scan_schedule.setCurrentIndex(i)
+        self.scan_schedule.currentIndexChanged.connect(self._apply_scan_schedule)
+        sched_row.addWidget(self.scan_schedule, 1)
+        sched_row.addStretch(1)
+        layout.addLayout(sched_row)
+        self._scan_timer = QTimer(self)
+        self._scan_timer.timeout.connect(self._scan_tick)
+        self._apply_scan_schedule(self.scan_schedule.currentIndex())
         return page
+
+    def _apply_scan_schedule(self, _i: int):
+        mins = int(self.scan_schedule.currentData() or 0)
+        db.set_setting("scan_interval_min", str(mins))
+        if not hasattr(self, "_scan_timer"):
+            return
+        self._scan_timer.stop()
+        if mins > 0:
+            self._scan_timer.start(mins * 60 * 1000)
+
+    def _scan_tick(self):
+        if self.scan_button.isEnabled():
+            self._run_scan()
 
     def _build_devbox_page(self) -> QWidget:
         page = QWidget()
@@ -435,6 +467,107 @@ class MainWindow(QMainWindow):
         self.experiments_table = self._make_table(["Time", "Kind", "Result", "Secs", "Goal"])
         layout.addWidget(self.experiments_table, 1)
         return page
+
+    def _build_personality_page(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setSpacing(8)
+        layout.addWidget(self._section_label("Personality"))
+
+        info = QLabel(
+            "Lotus adapts how it talks to you over time. See what it learned, "
+            "tune it yourself, or reset it — every personality choice is yours. "
+            "Security outputs (scans, alerts) always stay literal and professional.")
+        info.setObjectName("subtitle")
+        info.setWordWrap(True)
+        layout.addWidget(info)
+
+        arch_row = QHBoxLayout()
+        arch_row.addWidget(QLabel("Starting style (optional):"))
+        self._arch_combo = QComboBox()
+        self._arch_combo.addItem("Custom / learned", "")
+        for name in personality.ARCHETYPES:
+            self._arch_combo.addItem(name.title(), name)
+        arch_row.addWidget(self._arch_combo, 1)
+        arch_btn = QPushButton("Apply")
+        arch_btn.clicked.connect(self._apply_archetype)
+        arch_row.addWidget(arch_btn)
+        layout.addLayout(arch_row)
+
+        self._trait_sliders = {}
+        prof = personality.get()
+        for t in personality.TRAITS:
+            row = QHBoxLayout()
+            row.addWidget(QLabel(t.replace("_", " ").title()))
+            s = QSlider(Qt.Orientation.Horizontal)
+            s.setRange(0, 100)
+            s.setValue(int(prof["traits"].get(t, 0.5) * 100))
+            s.valueChanged.connect(lambda v, n=t: personality.set_trait(n, v / 100.0))
+            row.addWidget(s, 1)
+            self._trait_sliders[t] = s
+            layout.addLayout(row)
+
+        layout.addWidget(QLabel("How should Lotus treat you?"))
+        style_row = QHBoxLayout()
+        self.style_note_input = QLineEdit()
+        self.style_note_input.setPlaceholderText("e.g. keep it brief, no fluff, I like examples")
+        style_row.addWidget(self.style_note_input, 1)
+        note_btn = QPushButton("Save")
+        note_btn.clicked.connect(self._save_style_note)
+        style_row.addWidget(note_btn)
+        analyze_btn = QPushButton("Analyze my style")
+        analyze_btn.clicked.connect(self._analyze_style)
+        style_row.addWidget(analyze_btn)
+        layout.addLayout(style_row)
+
+        hist_lbl = QLabel("What Lotus has learned")
+        hist_lbl.setObjectName("section")
+        layout.addWidget(hist_lbl)
+        self.personality_hist = QTextBrowser()
+        layout.addWidget(self.personality_hist, 1)
+
+        reset = QPushButton("Reset to neutral")
+        reset.clicked.connect(self._reset_personality)
+        layout.addWidget(reset, 0, Qt.AlignmentFlag.AlignRight)
+        self._refresh_personality()
+        return page
+
+    def _apply_archetype(self):
+        name = self._arch_combo.currentData()
+        if name and personality.apply_archetype(name):
+            self._refresh_personality()
+
+    def _save_style_note(self):
+        if personality.analyze_style(self.style_note_input.text()):
+            self.style_note_input.clear()
+
+    def _analyze_style(self):
+        self._run_bg(lambda: personality.synthesize(),
+                     on_ok=lambda ok: self._refresh_personality())
+
+    def _reset_personality(self):
+        if QMessageBox.question(self, "Reset personality",
+                                "Reset Lotus's learned personality to neutral defaults?") \
+                == QMessageBox.StandardButton.Yes:
+            personality.reset()
+            self._refresh_personality()
+
+    def _refresh_personality(self):
+        prof = personality.get()
+        for t, s in getattr(self, "_trait_sliders", {}).items():
+            s.blockSignals(True)
+            s.setValue(int(prof["traits"].get(t, 0.5) * 100))
+            s.blockSignals(False)
+        parts = []
+        if prof["notes"]:
+            parts.append(f"<b>Style notes:</b> {html.escape(prof['notes'])}")
+        for h in personality.history(10):
+            changes = ", ".join(f"{k.replace('_',' ')} {v:+.2f}" for k, v in h["deltas"].items()) or "—"
+            parts.append(
+                f"<div style='margin:4px 0;'><b>{html.escape(h['created'][:19])}</b> — "
+                f"{html.escape(changes)}<br><i>{html.escape(h['reason'])}</i></div>")
+        self.personality_hist.setHtml(
+            "".join(parts) or "<i>Nothing learned yet — keep chatting.</i>")
 
     def _make_table(self, columns: list[str]) -> QTableWidget:
         table = QTableWidget(0, len(columns))
