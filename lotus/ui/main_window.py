@@ -147,6 +147,7 @@ class MainWindow(QMainWindow):
         threading.Thread(target=worker, daemon=True).start()
 
     def _poll_jobs(self):
+        self._drain_chunks()
         remaining = []
         for q, on_ok, on_err in self._jobs:
             try:
@@ -165,6 +166,28 @@ class MainWindow(QMainWindow):
             except Exception as exc:  # noqa: BLE001
                 self._show_error(exc)
         self._jobs = remaining
+
+    def _drain_chunks(self):
+        chunks_q = getattr(self, "_chunks", None)
+        if chunks_q is None:
+            return
+        while True:
+            try:
+                piece = chunks_q.get_nowait()
+            except queue.Empty:
+                break
+            if not self._streamed:
+                accent = html.escape(theme.current()["section"])
+                self.chat_view.append(
+                    f"<div class='msg' style='margin:8px 0;'><b style='color:{accent}'>Lotus:</b></div>"
+                )
+                self.chat_view.moveCursor(self.chat_view.textCursor().MoveOperation.End)
+                self._streamed = True
+                self.thinking_label.hide()
+                self._set_chat_status("Lotus is typing…")
+            self.chat_view.insertPlainText(piece)
+            bar = self.chat_view.verticalScrollBar()
+            bar.setValue(bar.maximum())
 
     def _show_error(self, exc: Exception):
         message = str(exc) or exc.__class__.__name__
@@ -554,8 +577,10 @@ class MainWindow(QMainWindow):
 
         self._set_chat_status("Lotus is thinking…")
         self.thinking_label.show()
+        self._chunks: queue.Queue = queue.Queue()
+        self._streamed = False
         self._run_bg(
-            lambda: ai.ask(text),
+            lambda: ai.ask_stream(text, self._chunks.put),
             on_ok=self._on_answer,
             on_err=self._on_answer_error,
         )
@@ -590,7 +615,8 @@ class MainWindow(QMainWindow):
 
     def _on_answer(self, answer: str):
         self.thinking_label.hide()
-        self._append_chat("Lotus", answer)
+        if not self._streamed:
+            self._append_chat("Lotus", answer)
         self._set_chat_status("Lotus online — cybersecurity mode")
         self.ask_input.setEnabled(True)
         self.ask_input.setFocus()

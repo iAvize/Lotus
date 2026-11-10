@@ -41,4 +41,9 @@ Herdr SOC's `Lotus-Workbench`. It is where Lotus experiments on itself:
 5. Bump `version.json` and `lotus/__init__.py` together for beta changes.
 6. After editing Python, run `python scripts/check.py`.
 7. Releases are Windows zips built by `python scripts/build_beta_zip.py`.
+8. After any change, keep all copies in sync and report where updates landed:
+   `Lotus Source`, `C:\Users\akaAv\Lotus Beta`, the rebuilt `Lotus Beta.exe`
+   (PyInstaller spec in the Beta folder), the `iAvize/Lotus` repo, and the
+   GitHub release (tag = version.json). Tell the user which of these updated.
 8. New left-panel features must be registered with `_register_section` so each feature gets its own clickable panel.
+10. Lotus stays text-chat only — no voice/verbal commands unless the user explicitly asks for them.

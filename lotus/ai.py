@@ -169,11 +169,7 @@ def _generate(prompt: str, *, use_search: bool = False, use_devbox: bool = False
     errors: list[str] = []
     for model in MODEL_LADDER:
         try:
-            response = client.models.generate_content(
-                model=model,
-                contents=prompt,
-                config=cfg,
-            )
+            response = _backend_call(client, model, prompt, cfg)
             text = _response_text(response)
             if text:
                 return text, model
@@ -182,6 +178,48 @@ def _generate(prompt: str, *, use_search: bool = False, use_devbox: bool = False
             errors.append(f"{model}: {type(exc).__name__}: {exc}")
             db.log("warning", "ai", f"Gemini model {model} failed: {type(exc).__name__}")
 
+    raise RuntimeError("Gemini could not answer. " + " | ".join(errors[-3:]))
+
+
+def _backend_call(client, model: str, prompt: str, cfg: dict, stream: bool = False):
+    """The single seam between Lotus and its AI backend.
+
+    Today this is Gemini via google-genai; a future LotusCloud backend
+    (license checks, rate limits, paid tiers) plugs in here without the rest
+    of the app changing.
+    """
+    if stream:
+        return client.models.generate_content_stream(model=model, contents=prompt, config=cfg)
+    return client.models.generate_content(model=model, contents=prompt, config=cfg)
+
+
+def _generate_stream(prompt: str, on_chunk, timeout_ms: int = 45_000) -> tuple[str, str]:
+    """Streaming variant of _generate for the plain-chat path."""
+    api_key = config.get_gemini_key()
+    if not api_key:
+        raise RuntimeError("Gemini API key is not configured. Open Settings and add your key.")
+    memories = db.memory_context()
+    system = SYSTEM_PROMPT + f"\n\nCurrent local time: {_now()}"
+    if memories:
+        system += f"\n\nKnown memories/preferences:\n{memories}"
+    cfg = {"system_instruction": system, "temperature": 0.7, "max_output_tokens": 2048}
+    client = _client(api_key, timeout_ms)
+    errors: list[str] = []
+    for model in MODEL_LADDER:
+        try:
+            parts: list[str] = []
+            for chunk in _backend_call(client, model, prompt, cfg, stream=True):
+                piece = getattr(chunk, "text", "") or ""
+                if piece:
+                    parts.append(piece)
+                    on_chunk(piece)
+            text = "".join(parts)
+            if text:
+                return text, model
+            errors.append(f"{model}: empty response")
+        except Exception as exc:
+            errors.append(f"{model}: {type(exc).__name__}: {exc}")
+            db.log("warning", "ai", f"Gemini model {model} failed: {type(exc).__name__}")
     raise RuntimeError("Gemini could not answer. " + " | ".join(errors[-3:]))
 
 
@@ -252,6 +290,61 @@ def ask(user_text: str) -> str:
             db.log("warning", "ai", f"Gemini search failed, trying DDG fallback: {exc}")
             answer = _ddg_answer(user_text)
             model = "duckduckgo"
+        else:
+            raise
+
+    db.add_message("assistant", answer)
+    db.remember_request(user_text, answer, model=model, used_search=use_search)
+    db.log("info", "chat", f"response from {model or 'unknown'}")
+    return answer
+
+
+def ask_stream(user_text: str, on_chunk) -> str:
+    """Like ask(), but delivers reply text through on_chunk(str) as it streams.
+
+    Tool/devbox and search paths stay buffered (function-calling needs whole
+    responses) — those deliver their answer as a single chunk."""
+    user_text = user_text.strip()
+    if not user_text:
+        raise ValueError("Ask Lotus a question first.")
+
+    db.add_message("user", user_text)
+    db.log("info", "chat", f"request: {user_text[:300]}")
+
+    memory_reply = _memory_command(user_text)
+    if memory_reply:
+        db.add_message("assistant", memory_reply)
+        db.remember_request(user_text, memory_reply, model="local-memory")
+        on_chunk(memory_reply)
+        return memory_reply
+
+    history = db.recent_messages(14)
+    transcript_lines = []
+    for row in history[-12:]:
+        role = "User" if row["role"] == "user" else "Lotus"
+        transcript_lines.append(f"{role}: {row['content']}")
+    transcript_lines.append("Lotus:")
+    prompt = "\n".join(transcript_lines)
+
+    use_devbox = wants_devbox(user_text)
+    use_search = wants_search(user_text) and not use_devbox
+    answer = ""
+    model = ""
+    try:
+        if use_devbox or use_search:
+            answer, model = _generate(prompt, use_search=use_search, use_devbox=use_devbox,
+                                      timeout_ms=120_000 if use_devbox else 60_000)
+            if answer:
+                on_chunk(answer)
+        else:
+            answer, model = _generate_stream(prompt, on_chunk, timeout_ms=60_000)
+    except Exception as exc:
+        if use_search:
+            db.log("warning", "ai", f"Gemini search failed, trying DDG fallback: {exc}")
+            answer = _ddg_answer(user_text)
+            model = "duckduckgo"
+            if answer:
+                on_chunk(answer)
         else:
             raise
 

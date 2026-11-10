@@ -8,6 +8,7 @@ from PyQt6.QtGui import QColor, QPixmap
 from PyQt6.QtWidgets import QApplication, QSplashScreen
 
 from . import config, db, updater
+from . import crashlog
 from .ui.main_window import MainWindow
 from .ui.setup_dialog import SetupDialog
 
@@ -30,6 +31,7 @@ def _apply_pending_update(app: QApplication) -> int:
 
 
 def main() -> int:
+    crashlog.install()
     db.log("info", "app", "Lotus starting")
     app = QApplication(sys.argv)
     app.setApplicationName("Lotus")

@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (
     QMessageBox, QPushButton, QVBoxLayout,
 )
 
-from .. import ai, config, db, startup
+from .. import ai, config, crashlog, db, startup
 from . import theme
 
 
@@ -61,6 +61,10 @@ class SettingsDialog(QDialog):
         self.startup_check.toggled.connect(self._toggle_startup)
         layout.addWidget(self.startup_check)
 
+        report_btn = QPushButton("Copy error report")
+        report_btn.clicked.connect(self._copy_report)
+        layout.addWidget(report_btn)
+
         self.status = QLabel("")
         self.status.setWordWrap(True)
         self.status.setStyleSheet(f"color: {theme.current()['accent_light']};")
@@ -79,6 +83,13 @@ class SettingsDialog(QDialog):
         self.status.setText(f"Theme: {name}")
         self.status.setStyleSheet(f"color: {theme.current()['accent_light']};")
         db.log("info", "settings", f"theme switched to {name}")
+
+    def _copy_report(self):
+        from PyQt6.QtWidgets import QApplication
+        QApplication.clipboard().setText(crashlog.build_report())
+        QMessageBox.information(
+            self, "Error report",
+            "Error report copied — paste it when reporting a bug to the developers.")
 
     def _toggle_startup(self, checked: bool):
         if startup.set_enabled(checked):
