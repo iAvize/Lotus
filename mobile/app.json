@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "name": "Lotus Beta",
+    "slug": "lotus-beta",
+    "version": "0.1.0-beta.1",
+    "scheme": "lotusbeta",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#080512",
+    "ios": {
+      "bundleIdentifier": "com.avize.lotus.beta",
+      "buildNumber": "1",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.avize.lotus.beta",
+      "versionCode": 1
+    }
+  }
+}

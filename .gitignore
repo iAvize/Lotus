@@ -33,3 +33,7 @@ _apply_lotus_update.bat
 Thumbs.db
 desktop.ini
 *.log
+mobile/node_modules/
+mobile/.expo/
+mobile/dist/
+mobile/web-build/
