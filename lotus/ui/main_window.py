@@ -505,39 +505,10 @@ class MainWindow(QMainWindow):
         return center
 
     def _toggle_fullscreen(self):
-        anim = getattr(self, "_fs_anim", None)
-        if anim is not None and anim.state() == QPropertyAnimation.State.Running:
-            return
-        # Snapshot approach (how native apps do it): grab the window once,
-        # animate a borderless ghost image to the target rect while the real
-        # window flips state hidden underneath. The pixels never re-layout,
-        # so text stays crisp and the motion reads smooth.
-        entering = not self.isFullScreen()
-        target = (self.screen().geometry() if entering
-                  else getattr(self, "_saved_geom", None) or self.normalGeometry())
-        ghost = QLabel(None, Qt.WindowType.FramelessWindowHint
-                       | Qt.WindowType.WindowStaysOnTopHint)
-        ghost.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
-        ghost.setScaledContents(True)
-        ghost.setPixmap(self.grab())
-        ghost.setGeometry(self.geometry())
-        ghost.show()
-        if entering:
-            self._saved_geom = self.geometry()
-            self.hide()
-            finish = self.showFullScreen
-        else:
+        if self.isFullScreen():
             self.showNormal()
-            self.hide()
-            finish = self.show
-        a = QPropertyAnimation(ghost, b"geometry", self)
-        a.setDuration(400)
-        a.setStartValue(ghost.geometry())
-        a.setEndValue(target)
-        a.setEasingCurve(QEasingCurve.Type.InOutCubic)
-        a.finished.connect(lambda: (finish(), QTimer.singleShot(0, ghost.close)))
-        a.start()
-        self._fs_anim = a
+        else:
+            self.showFullScreen()
 
     def apply_theme(self, name: str):
         """Switch the accent palette instantly — widgets repaint on their own
