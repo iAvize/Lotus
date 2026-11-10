@@ -508,26 +508,29 @@ class MainWindow(QMainWindow):
         anim = getattr(self, "_fs_anim", None)
         if anim is not None and anim.state() == QPropertyAnimation.State.Running:
             return
-        screen_geom = self.screen().geometry()
-        if self.isFullScreen():
-            end = getattr(self, "_saved_geom", None) or self.normalGeometry()
-            self.showNormal()
-            self.setGeometry(screen_geom)  # hold the fullscreen look while shrinking back
-            self._fs_anim = self._animate_geometry(end)
-        else:
-            self._saved_geom = self.geometry()
-            self._fs_anim = self._animate_geometry(screen_geom, done=self.showFullScreen)
+        # Crossfade through opacity instead of resizing: a geometry animation
+        # re-lays the whole window out every frame and smears text. Fading is
+        # what the eye reads as "smooth" and nothing can blur mid-transition.
+        self._fs_anim = self._fs_fade(1.0, 0.0, self._fs_flip)
 
-    def _animate_geometry(self, target, done=None):
-        a = QPropertyAnimation(self, b"geometry", self)
-        a.setDuration(650)
-        a.setStartValue(self.geometry())
-        a.setEndValue(target)
-        a.setEasingCurve(QEasingCurve.Type.InOutCubic)
+    def _fs_fade(self, start: float, end: float, done=None):
+        a = QPropertyAnimation(self, b"windowOpacity", self)
+        a.setDuration(190)
+        a.setStartValue(start)
+        a.setEndValue(end)
+        a.setEasingCurve(QEasingCurve.Type.InOutSine)
         if done:
             a.finished.connect(done)
         a.start()
         return a
+
+    def _fs_flip(self):
+        if self.isFullScreen():
+            self.showNormal()
+        else:
+            self._saved_geom = self.geometry()
+            self.showFullScreen()
+        self._fs_anim = self._fs_fade(0.0, 1.0)
 
     def apply_theme(self, name: str):
         """Switch the accent palette instantly — widgets repaint on their own
