@@ -20,7 +20,7 @@ Lotus is a Windows cybersecurity assistant built for SOC analysis, AppSec, DevSe
 3. First run creates a `Lotus Beta` desktop shortcut with the app icon.
 4. On first launch, Lotus prompts for your own Gemini API key and links to Google AI Studio where you can create one.
 
-`Lotus.Beta.zip` `` exe + docs only. This is for people who want a zipped version of the release over the exe only release.
+`Lotus.Beta.zip` exe + docs only. This is for people who want a zipped version of the release over the exe only release.
 
 `Lotus.Source.Trusted.Developers.zip` is trusted developer access only and is password-protected. It includes the source code and the Windows app.
 
