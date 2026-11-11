@@ -222,10 +222,8 @@ class MainWindow(QMainWindow):
         header_layout.addWidget(title_box)
         header_layout.addStretch(1)
 
-        self.update_button = QPushButton("Update")
-        self.update_button.setEnabled(False)
-        self.update_button.setVisible(False)  # only exists while an update is available
-        self.update_button.clicked.connect(self._on_update_clicked)
+        self.update_button = QPushButton("Check for updates")
+        self.update_button.clicked.connect(self._check_update_now)
         header_layout.addWidget(self.update_button)
 
         settings_button = QPushButton("Settings")
@@ -1040,14 +1038,31 @@ class MainWindow(QMainWindow):
     def _on_update_check(self, info):
         self._update_info = info
         if info:
-            self.update_button.setEnabled(True)
-            self.update_button.setVisible(True)
-            self.update_button.setText(f"Update {info.get('version', '')}")
-            self.update_button.setToolTip(f"Lotus {info.get('version', '')} is available")
             db.log("info", "updater", f"update available: {info.get('version')}")
-        else:
-            self.update_button.setVisible(False)
-            self.update_button.setEnabled(False)
+
+    def _check_update_now(self):
+        self.update_button.setEnabled(False)
+        self.update_button.setText("Checking…")
+
+        def done(info):
+            self.update_button.setEnabled(True)
+            self.update_button.setText("Check for updates")
+            self._update_info = info
+            if info:
+                self._on_update_clicked()
+            else:
+                QMessageBox.information(
+                    self, "Check for updates",
+                    "You're currently on the latest version.")
+
+        def err(exc):
+            self.update_button.setEnabled(True)
+            self.update_button.setText("Check for updates")
+            db.log("warning", "updater", f"update check failed: {exc}")
+            QMessageBox.warning(self, "Check for updates",
+                                f"Couldn't check for updates: {exc}")
+
+        self._run_bg(updater.check_for_update, on_ok=done, on_err=err)
 
     def _on_update_clicked(self):
         info = self._update_info
@@ -1057,6 +1072,7 @@ class MainWindow(QMainWindow):
         box = QMessageBox(self)
         box.setWindowTitle(f"Update Lotus to {info.get('version', '')}?")
         box.setText(
+            f"Update available — Lotus {info.get('version', '')}.\n\n"
             f"{body}\n\n"
             "Update and restart — install now, Lotus relaunches when done.\n"
             "Update on relaunch — keep using Lotus; it installs automatically "
