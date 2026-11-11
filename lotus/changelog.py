@@ -8,6 +8,8 @@ from __future__ import annotations
 from . import db
 
 RELEASES = [
+    {"version": "0.1.0-beta.30", "date": "2026-11-10",
+     "notes": ["Update popup auto-shows on launch again; Check for updates stays as backup"]},
     {"version": "0.1.0-beta.29", "date": "2026-11-10",
      "notes": ["Update button is now manual 'Check for updates' with latest-version / update-available popups"]},
     {"version": "0.1.0-beta.28", "date": "2026-11-10",

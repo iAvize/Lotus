@@ -1039,6 +1039,7 @@ class MainWindow(QMainWindow):
         self._update_info = info
         if info:
             db.log("info", "updater", f"update available: {info.get('version')}")
+            self._on_update_clicked()
 
     def _check_update_now(self):
         self.update_button.setEnabled(False)
