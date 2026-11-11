@@ -95,6 +95,7 @@ def _run(*args: str, timeout: int = 120) -> subprocess.CompletedProcess:
         return subprocess.CompletedProcess(["VBoxManage"], 127, "", "VBoxManage not found")
     try:
         return subprocess.run([exe, *args], capture_output=True, text=True,
+                              creationflags=0x08000000 if os.name == "nt" else 0,
                               timeout=timeout, encoding="utf-8", errors="replace")
     except subprocess.TimeoutExpired:
         return subprocess.CompletedProcess([exe, *args], 124, "", "timeout")
@@ -360,7 +361,8 @@ def sync() -> dict:
         cmd += ["/XF", f]
     try:
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=300,
-                           encoding="utf-8", errors="replace")
+                           encoding="utf-8", errors="replace",
+                           creationflags=0x08000000 if os.name == "nt" else 0)
     except FileNotFoundError:
         return {"ok": False, "error": "robocopy not available (Windows only)"}
     # robocopy exit codes 0-7 are success; >=8 is a failure

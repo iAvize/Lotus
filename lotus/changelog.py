@@ -8,6 +8,8 @@ from __future__ import annotations
 from . import db
 
 RELEASES = [
+    {"version": "0.1.0-beta.32", "date": "2026-11-11",
+     "notes": ["Animated Lotus logo splash on launch", "Console-window flash on startup removed"]},
     {"version": "0.1.0-beta.31", "date": "2026-11-10",
      "notes": ["Update check now trusts the binary's baked version over the sidecar version.json"]},
     {"version": "0.1.0-beta.30", "date": "2026-11-10",

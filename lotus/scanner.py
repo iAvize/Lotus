@@ -76,6 +76,7 @@ def _is_signed(path: Path) -> str | None:
             text=True,
             timeout=15,
             env={**os.environ, "LOTUS_SIG_PATH": str(path)},
+            creationflags=0x08000000 if os.name == "nt" else 0,
         )
         status = (result.stdout or "").strip()
         if status == "Valid":

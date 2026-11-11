@@ -38,10 +38,15 @@ def main() -> int:
     app.setOrganizationName("Avize")
     if updater.pending_update():
         return _apply_pending_update(app)
+    from .ui.splash import LotusSplash
+    splash = LotusSplash()
+    splash.show()
+    app.processEvents()
     window = MainWindow()
     if not config.is_configured():
         SetupDialog(window).exec()
     window.show()
+    splash.finish(window)
     from PyQt6.QtCore import QTimer
     QTimer.singleShot(600, window._maybe_show_patchnotes)
     code = app.exec()
