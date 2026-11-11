@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
     QTableWidgetItem, QTabWidget, QTextBrowser, QTextEdit, QVBoxLayout, QWidget,
 )
 
-from .. import __version__, ai, config, db, devbox, github, personality, platform_info, scanner, updater, usage
+from .. import __version__, ai, changelog, config, db, devbox, github, personality, platform_info, scanner, updater, usage
 from . import theme
 from .settings_dialog import SettingsDialog
 from .widgets import MatrixRain, ReactorWidget
@@ -285,6 +285,7 @@ class MainWindow(QMainWindow):
         self._register_section("scan", "File / Repo Scan", self._build_scan_page(), nav_layout)
         self._register_section("devbox", "Devbox", self._build_devbox_page(), nav_layout)
         self._register_section("personality", "Personality", self._build_personality_page(), nav_layout)
+        self._register_section("patchnotes", "Patch Notes", self._build_patchnotes_page(), nav_layout)
         nav_layout.addStretch(1)
 
         layout.addWidget(nav)
@@ -623,6 +624,36 @@ class MainWindow(QMainWindow):
                 f"{html.escape(changes)}<br><i>{html.escape(h['reason'])}</i></div>")
         self.personality_hist.setHtml(
             "".join(parts) or "<i>Nothing learned yet — keep chatting.</i>")
+
+    def _build_patchnotes_page(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.addWidget(self._section_label("Patch Notes"))
+        view = QTextBrowser()
+        parts = []
+        for r in changelog.RELEASES:
+            try:
+                from datetime import datetime as _dt
+                d = _dt.fromisoformat(r["date"]).strftime("%b %-d, %Y")
+            except Exception:
+                d = r["date"]
+            items = "".join(f"<li>{html.escape(n)}</li>" for n in r["notes"])
+            parts.append(
+                f"<div style='margin-bottom:12px;'><b>v{html.escape(r['version'])}</b>"
+                f" <i style='color:#a78bfa'>· {html.escape(d)}</i><ul>{items}</ul></div>")
+        view.setHtml("".join(parts))
+        layout.addWidget(view, 1)
+        return page
+
+    def _maybe_show_patchnotes(self):
+        entry = changelog.unseen()
+        if not entry:
+            return
+        changelog.mark_seen()
+        items = "\n".join(f"• {n}" for n in entry["notes"])
+        QMessageBox.information(
+            self, f"Lotus updated to v{entry['version']}",
+            f"What's new in this version:\n\n{items}\n\nSee Patch Notes for the full history.")
 
     def _make_table(self, columns: list[str]) -> QTableWidget:
         table = QTableWidget(0, len(columns))

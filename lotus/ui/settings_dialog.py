@@ -1,6 +1,8 @@
 """Settings dialog for Lotus secrets, appearance, and integrations."""
 from __future__ import annotations
 
+from PyQt6.QtCore import QUrl
+from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtWidgets import (
     QCheckBox, QDialog, QDialogButtonBox, QHBoxLayout, QLabel, QLineEdit,
     QMessageBox, QPushButton, QVBoxLayout,
@@ -65,6 +67,10 @@ class SettingsDialog(QDialog):
         report_btn.clicked.connect(self._copy_report)
         layout.addWidget(report_btn)
 
+        feedback_btn = QPushButton("Send feedback")
+        feedback_btn.clicked.connect(self._send_feedback)
+        layout.addWidget(feedback_btn)
+
         self.status = QLabel("")
         self.status.setWordWrap(True)
         self.status.setStyleSheet(f"color: {theme.current()['accent_light']};")
@@ -90,6 +96,22 @@ class SettingsDialog(QDialog):
         QMessageBox.information(
             self, "Error report",
             "Error report copied — paste it when reporting a bug to the developers.")
+
+    def _send_feedback(self):
+        from urllib.parse import quote
+        try:
+            from ..feedback_email import FEEDBACK_EMAIL as _baked
+        except Exception:
+            _baked = ""
+        email = db.get_setting("feedback_email", "") or _baked
+        if not email:
+            QMessageBox.information(self, "Feedback",
+                                    "Feedback email isn't configured yet.")
+            return
+        from .. import __version__, usage
+        subj = quote(f"Lotus Beta feedback (v{__version__})")
+        body = quote(f"Version: {__version__}\nInstall: {usage.install_id()}\n\n")
+        QDesktopServices.openUrl(QUrl(f"mailto:{email}?subject={subj}&body={body}"))
 
     def _toggle_startup(self, checked: bool):
         if startup.set_enabled(checked):

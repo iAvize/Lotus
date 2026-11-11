@@ -42,6 +42,8 @@ def main() -> int:
     if not config.is_configured():
         SetupDialog(window).exec()
     window.show()
+    from PyQt6.QtCore import QTimer
+    QTimer.singleShot(600, window._maybe_show_patchnotes)
     code = app.exec()
     db.log("info", "app", "Lotus closed")
     return code
