@@ -24,11 +24,16 @@ def _version_tuple(value: str) -> tuple[int, ...]:
 
 def _local_version() -> str:
     try:
+        from . import __version__  # the binary's own version is authoritative
+        if __version__:
+            return __version__
+    except Exception:
+        pass
+    try:
         data = json.loads((config.BASE_DIR / "version.json").read_text(encoding="utf-8"))
         return str(data.get("version") or "")
     except Exception:
-        from . import __version__
-        return __version__
+        return ""
 
 
 def check_for_update(repo: str = REPO, timeout: int = 15) -> dict | None:
