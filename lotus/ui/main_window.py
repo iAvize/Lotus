@@ -838,6 +838,13 @@ class MainWindow(QMainWindow):
         timers, so the whole app recolors in well under a second."""
         config.save_setting("ui_theme", name)
         self.setStyleSheet(theme.stylesheet(name))
+        if hasattr(self, "orb_nav"):
+            self.orb_nav.apply_theme()
+        if hasattr(self, "clock_box"):
+            self.clock_box.apply_theme()
+        if hasattr(self, "version_label"):
+            self.version_label.setStyleSheet(
+                f"color: {theme.current()['subtitle']}; font-size: 10px;")
 
     # ── Dragging ────────────────────────────────────────────────────────────
     def _begin_drag(self, pos):
