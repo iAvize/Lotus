@@ -1,4 +1,4 @@
 """Lotus — Windows-first cybersecurity AI assistant (beta)."""
 
-__version__ = "0.1.0-beta.41"
+__version__ = "0.1.0-beta.42"
 APP_NAME = "Lotus"

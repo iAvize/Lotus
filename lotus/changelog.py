@@ -8,6 +8,8 @@ from __future__ import annotations
 from . import db
 
 RELEASES = [
+    {"version": "0.1.0-beta.42", "date": "2026-11-11",
+     "notes": ["Fixed dead hover-scrub - orb animation now uses a real Qt property", "Menu title raised above the orbs"]},
     {"version": "0.1.0-beta.41", "date": "2026-11-11",
      "notes": ["Hover-only orb scrub, click only opens focused orb", "Centered LOTUS title in menu mode", "Fixed dead chat - center_status survived reactor removal"]},
     {"version": "0.1.0-beta.40", "date": "2026-11-11",

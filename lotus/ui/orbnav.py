@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import math
 
-from PyQt6.QtCore import QEasingCurve, QPointF, QPropertyAnimation, Qt, pyqtSignal
+from PyQt6.QtCore import QEasingCurve, QPointF, QPropertyAnimation, Qt, pyqtProperty, pyqtSignal
 from PyQt6.QtGui import QColor, QFont, QPainter, QPen, QPolygonF
 from PyQt6.QtWidgets import QWidget
 
@@ -44,7 +44,7 @@ class OrbNav(QWidget):
         self._pos = max(-0.4, min(len(self._sections) - 0.6, v))
         self.update()
 
-    scrollPos = property(_get_pos, _set_pos)
+    scrollPos = pyqtProperty(float, fget=_get_pos, fset=_set_pos)
 
     def set_sections(self, sections: list[tuple[str, str]]):
         self._sections = sections

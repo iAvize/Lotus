@@ -315,8 +315,8 @@ class MainWindow(QMainWindow):
         self._section_col = QVBoxLayout()
         self._section_col.setContentsMargins(0, 0, 0, 0)
         self._section_col.setSpacing(6)
-        self._section_col.addStretch(1)
         self._section_col.addWidget(self._menu_title)
+        self._section_col.addStretch(1)
         self._section_col.addWidget(self.orb_nav)
         self._section_col.addStretch(1)
         self._section_col.addWidget(self.section_stack, 3)
@@ -346,7 +346,7 @@ class MainWindow(QMainWindow):
         if getattr(self, "_open_section", None) == key:
             self._open_section = None
             self.section_stack.hide()
-            self._section_col.setStretch(0, 1)
+            self._section_col.setStretch(1, 1)
             self._section_col.setStretch(3, 1)
             self._menu_title.show()
             self._header_title.hide()
@@ -356,7 +356,7 @@ class MainWindow(QMainWindow):
         self._open_section = key
         for section_key, button in self._section_buttons.items():
             button.setChecked(section_key == key)
-        self._section_col.setStretch(0, 0)
+        self._section_col.setStretch(1, 0)
         self._section_col.setStretch(3, 0)
         self._menu_title.hide()
         self._header_title.show()
