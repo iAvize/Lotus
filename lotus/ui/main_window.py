@@ -253,9 +253,9 @@ class MainWindow(QMainWindow):
         root.addWidget(content, 1)
 
         self.left_panel = self._build_left_panel()
+        content_layout.addWidget(self.left_panel, 1)
         # --- REACTOR PANEL REMOVED FOR ORB-NAV TEST (kept for revert):
-        # content_layout.addWidget(self.left_panel) ---
-        content_layout.addWidget(self._build_center(), 1)
+        # content_layout.addWidget(self._build_center(), 1) ---
 
     def _section_label(self, text: str) -> QLabel:
         label = QLabel(text)
@@ -265,7 +265,7 @@ class MainWindow(QMainWindow):
     def _build_left_panel(self) -> QFrame:
         panel = QFrame()
         panel.setObjectName("panel")
-        panel.setFixedWidth(620)
+        # --- WAS panel.setFixedWidth(620); full width for centered orb nav ---
         layout = QHBoxLayout(panel)
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(10)
