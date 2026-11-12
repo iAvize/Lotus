@@ -8,6 +8,8 @@ from __future__ import annotations
 from . import db
 
 RELEASES = [
+    {"version": "0.1.0-beta.33", "date": "2026-11-11",
+     "notes": ["Orb-style scrollable nav replaces left panel (test - easily reverted)"]},
     {"version": "0.1.0-beta.32", "date": "2026-11-11",
      "notes": ["Animated Lotus logo splash on launch", "Console-window flash on startup removed"]},
     {"version": "0.1.0-beta.31", "date": "2026-11-10",
@@ -23,7 +25,7 @@ RELEASES = [
                "Settings: feedback button (emails the developer)",
                "Mobile app prepared for TestFlight"]},
     {"version": "0.1.0-beta.26", "date": "2026-11-10",
-     "notes": ["Usage metering — tokens + Lotus-Lab VM minutes",
+     "notes": ["Usage metering - tokens + Lotus-Lab VM minutes",
                "Logs 'View' dropdown: Activity / My usage / Global minutes (dev builds)"]},
     {"version": "0.1.0-beta.25", "date": "2026-11-09",
      "notes": ["Auto-scan dropdown moved under the scan target selector"]},
@@ -53,7 +55,7 @@ RELEASES = [
      "notes": ["Auto-growing multi-line chat box",
                "5 instant UI themes (purple/blue/red/pink/green)",
                "Run-on-startup toggle", "Fullscreen button",
-               "Updater rework — hidden until needed, restart/relaunch choice, progress bar"]},
+               "Updater rework - hidden until needed, restart/relaunch choice, progress bar"]},
     {"version": "0.1.0-beta.14", "date": "2026-11-09",
      "notes": ["Dedicated 'Lotus-Lab' VirtualBox devbox + Devbox panel",
                "Autonomous staging/test/promote loop with lessons memory"]},

@@ -19,6 +19,7 @@ from PyQt6.QtWidgets import (
 )
 
 from .. import __version__, ai, changelog, config, db, devbox, github, personality, platform_info, scanner, updater, usage
+from .orbnav import OrbNav
 from . import theme
 from .settings_dialog import SettingsDialog
 from .widgets import MatrixRain, ReactorWidget
@@ -286,7 +287,12 @@ class MainWindow(QMainWindow):
         self._register_section("patchnotes", "Patch Notes", self._build_patchnotes_page(), nav_layout)
         nav_layout.addStretch(1)
 
-        layout.addWidget(nav)
+        # --- OLD LEFT-PANEL NAV (kept for revert): layout.addWidget(nav) ---
+        self.orb_nav = OrbNav()
+        self.orb_nav.set_sections(
+            [(k, b.text()) for k, b in self._section_buttons.items()])
+        self.orb_nav.section_selected.connect(self._show_section)
+        layout.addWidget(self.orb_nav)
         layout.addWidget(self.section_stack, 1)
 
         self._refresh_scan_targets()
@@ -310,6 +316,8 @@ class MainWindow(QMainWindow):
         for section_key, button in self._section_buttons.items():
             button.setChecked(section_key == key)
         self.section_stack.setCurrentIndex(self._section_pages[key])
+        if hasattr(self, "orb_nav"):
+            self.orb_nav.set_active(key)
 
     def _build_ask_page(self) -> QWidget:
         page = QWidget()
