@@ -8,6 +8,8 @@ from __future__ import annotations
 from . import db
 
 RELEASES = [
+    {"version": "0.1.0-beta.44", "date": "2026-11-11",
+     "notes": ["Hover scrub slowed further - 600ms cadence, 450ms glide per orb"]},
     {"version": "0.1.0-beta.43", "date": "2026-11-11",
      "notes": ["Hover scrub steps one orb at a time - no more skipping past targets"]},
     {"version": "0.1.0-beta.42", "date": "2026-11-11",

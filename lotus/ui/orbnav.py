@@ -34,10 +34,10 @@ class OrbNav(QWidget):
         self._press_x = -1.0
         self._hover_target = -1
         self._hover_timer = QTimer(self)
-        self._hover_timer.setInterval(320)
+        self._hover_timer.setInterval(600)
         self._hover_timer.timeout.connect(self._step_toward_hover)
         self._anim = QPropertyAnimation(self, b"scrollPos", self)
-        self._anim.setDuration(260)
+        self._anim.setDuration(450)
         self._anim.setEasingCurve(QEasingCurve.Type.OutCubic)
         self._theme = theme.current()
 
