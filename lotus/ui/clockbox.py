@@ -21,14 +21,14 @@ _YMD_CITIES = {"Tokyo", "Seoul", "Shanghai", "Hong_Kong", "Taipei", "Singapore",
 
 def _date_format(tzname: str) -> str:
     if not tzname:
-        return "%m/%d/%Y"
+        return "%b %d, %Y"
     region = tzname.split("/")[0]
     city = tzname.split("/")[-1]
     if region in ("America", "US"):
-        return "%m/%d/%Y"
+        return "%b %d, %Y"
     if region == "Asia" and city in _YMD_CITIES:
-        return "%Y/%m/%d"
-    return "%d/%m/%Y"
+        return "%Y %b %d"
+    return "%d %b %Y"
 
 
 class ClockBox(QFrame):
@@ -54,6 +54,7 @@ class ClockBox(QFrame):
 
         mid = QHBoxLayout()
         mid.setSpacing(6)
+        mid.addStretch(1)
         self.time_label = QLabel()
         self.time_label.setObjectName("clocktime")
         mid.addWidget(self.time_label)
@@ -71,10 +72,13 @@ class ClockBox(QFrame):
 
         self._info_row = QHBoxLayout()
         self._info_row.setSpacing(18)
+        self._info_row.addStretch(1)
         self.day_label = QLabel()
         self.day_label.setObjectName("clockmeta")
+        self.day_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.week_label = QLabel()
         self.week_label.setObjectName("clockmeta")
+        self.week_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._info_row.addWidget(self.day_label)
         self._info_row.addWidget(self.week_label)
         self._info_row.addStretch(1)
@@ -108,8 +112,7 @@ class ClockBox(QFrame):
     def _tick(self):
         tz = self._tz()
         now = datetime.now(tz) if tz else datetime.now()
-        self.date_label.setText(now.strftime("%b %d, %Y").upper()
-                                + "  \u00B7  " + now.strftime(_date_format(self._tzname)))
+        self.date_label.setText(now.strftime(_date_format(self._tzname)).upper())
         self.time_label.setText(now.strftime("%I:%M").lstrip("0"))
         self.sec_label.setText(now.strftime("%S"))
         self.ampm_label.setText(now.strftime("%p"))
