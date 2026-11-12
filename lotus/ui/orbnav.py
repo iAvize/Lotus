@@ -31,9 +31,7 @@ class OrbNav(QWidget):
         self._sections: list[tuple[str, str]] = []
         self._pos = 0.0
         self._target = 0.0
-        self._dragging = False
-        self._drag_x = 0.0
-        self._drag_pos = 0.0
+        self._press_x = -1.0
         self._anim = QPropertyAnimation(self, b"scrollPos", self)
         self._anim.setDuration(260)
         self._anim.setEasingCurve(QEasingCurve.Type.OutCubic)
@@ -81,39 +79,23 @@ class OrbNav(QWidget):
         return -1
 
     def mouseMoveEvent(self, e):
-        if self._dragging:
-            delta = e.position().x() - self._drag_x
-            self._set_pos(self._drag_pos - delta / self.SPACING)
-            return
+        # HOVER SCRUB: the carousel follows the cursor - no click, no drag.
         idx = self._orb_at(e.position().x(), e.position().y())
         if idx >= 0:
             self._scroll_to(idx)
 
     def mousePressEvent(self, e):
-        if e.button() != Qt.MouseButton.LeftButton:
-            return
-        self._dragging = True
-        self._drag_x = e.position().x()
-        self._drag_pos = self._pos
-        self._anim.stop()
+        if e.button() == Qt.MouseButton.LeftButton:
+            self._press_x = e.position().x()
 
     def mouseReleaseEvent(self, e):
-        if not self._dragging:
+        # Click = open the focused orb only; clicks never scrub the carousel.
+        if e.button() != Qt.MouseButton.LeftButton or self._press_x < 0:
             return
-        self._dragging = False
-        if abs(e.position().x() - self._drag_x) < 6:
-            idx = self._orb_at(e.position().x(), e.position().y())
-            if idx >= 0:
-                if abs(idx - self._pos) < 0.5:
-                    self.section_selected.emit(self._sections[idx][0])
-                else:
-                    self._scroll_to(idx)
-                return
-        self._scroll_to(round(self._pos))
-
-    def wheelEvent(self, e):
-        step = -1 if e.angleDelta().y() > 0 else 1
-        self._scroll_to(round(self._pos) + step)
+        self._press_x = -1.0
+        idx = self._orb_at(e.position().x(), e.position().y())
+        if idx >= 0 and abs(idx - self._pos) < 0.5:
+            self.section_selected.emit(self._sections[idx][0])
 
     def _star(self, p, x, y, r, color):
         pts = []

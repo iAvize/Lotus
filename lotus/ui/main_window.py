@@ -95,6 +95,9 @@ class MainWindow(QMainWindow):
         self._drag_offset = None
         self._update_info = None
         self._pending_os_question = ""
+        # Status label lives off-layout in orb-nav mode; _build_center re-binds
+        # it to the visible reactor panel if the old layout is ever restored.
+        self.center_status = QLabel("Lotus online — cybersecurity mode")
 
         self._build_ui()
         self.refresh_logs()
@@ -222,6 +225,7 @@ class MainWindow(QMainWindow):
         title_layout.addWidget(subtitle)
         header_layout.addWidget(title_box)
         header_layout.addStretch(1)
+        self._header_title = title_box
 
         self.update_button = QPushButton("Check for updates")
         self.update_button.clicked.connect(self._check_update_now)
@@ -293,10 +297,26 @@ class MainWindow(QMainWindow):
         self.orb_nav.set_sections(
             [(k, b.text()) for k, b in self._section_buttons.items()])
         self.orb_nav.section_selected.connect(self._show_section)
+
+        # Centered LOTUS title for orb-menu mode (hidden when a panel is open)
+        self._menu_title = QWidget()
+        mt = QVBoxLayout(self._menu_title)
+        mt.setContentsMargins(0, 0, 0, 0)
+        mt.setSpacing(2)
+        mt_title = QLabel("◈  L O T U S")
+        mt_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        mt_title.setStyleSheet("font-size: 34px; font-weight: 700; letter-spacing: 6px;")
+        mt_sub = QLabel("C Y B E R S E C U R I T Y   A I")
+        mt_sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        mt_sub.setStyleSheet("font-size: 12px; letter-spacing: 4px; color: #8b7fb0;")
+        mt.addWidget(mt_title)
+        mt.addWidget(mt_sub)
+
         self._section_col = QVBoxLayout()
         self._section_col.setContentsMargins(0, 0, 0, 0)
         self._section_col.setSpacing(6)
         self._section_col.addStretch(1)
+        self._section_col.addWidget(self._menu_title)
         self._section_col.addWidget(self.orb_nav)
         self._section_col.addStretch(1)
         self._section_col.addWidget(self.section_stack, 3)
@@ -307,6 +327,7 @@ class MainWindow(QMainWindow):
         # ORB MENU MODE: orbs dead-center, no panel shown until one is clicked
         self._open_section = None
         self.section_stack.hide()
+        self._header_title.hide()
         return panel
 
     def _register_section(self, key: str, title: str, page: QWidget, nav_layout: QVBoxLayout):
@@ -326,7 +347,9 @@ class MainWindow(QMainWindow):
             self._open_section = None
             self.section_stack.hide()
             self._section_col.setStretch(0, 1)
-            self._section_col.setStretch(2, 1)
+            self._section_col.setStretch(3, 1)
+            self._menu_title.show()
+            self._header_title.hide()
             for button in self._section_buttons.values():
                 button.setChecked(False)
             return
@@ -334,7 +357,9 @@ class MainWindow(QMainWindow):
         for section_key, button in self._section_buttons.items():
             button.setChecked(section_key == key)
         self._section_col.setStretch(0, 0)
-        self._section_col.setStretch(2, 0)
+        self._section_col.setStretch(3, 0)
+        self._menu_title.hide()
+        self._header_title.show()
         self.section_stack.show()
         self.section_stack.setCurrentIndex(self._section_pages[key])
         if hasattr(self, "orb_nav"):
