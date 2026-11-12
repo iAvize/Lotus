@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import math
 
-from PyQt6.QtCore import QEasingCurve, QPointF, QPropertyAnimation, Qt, pyqtProperty, pyqtSignal
+from PyQt6.QtCore import QEasingCurve, QPointF, QPropertyAnimation, Qt, QTimer, pyqtProperty, pyqtSignal
 from PyQt6.QtGui import QColor, QFont, QPainter, QPen, QPolygonF
 from PyQt6.QtWidgets import QWidget
 
@@ -32,6 +32,10 @@ class OrbNav(QWidget):
         self._pos = 0.0
         self._target = 0.0
         self._press_x = -1.0
+        self._hover_target = -1
+        self._hover_timer = QTimer(self)
+        self._hover_timer.setInterval(320)
+        self._hover_timer.timeout.connect(self._step_toward_hover)
         self._anim = QPropertyAnimation(self, b"scrollPos", self)
         self._anim.setDuration(260)
         self._anim.setEasingCurve(QEasingCurve.Type.OutCubic)
@@ -79,10 +83,32 @@ class OrbNav(QWidget):
         return -1
 
     def mouseMoveEvent(self, e):
-        # HOVER SCRUB: the carousel follows the cursor - no click, no drag.
+        # HOVER SCRUB: the carousel steps one orb at a time toward whatever
+        # orb the cursor rests on - slow enough to stop on the one you want.
         idx = self._orb_at(e.position().x(), e.position().y())
-        if idx >= 0:
-            self._scroll_to(idx)
+        if idx < 0:
+            return
+        if idx != self._hover_target:
+            self._hover_target = idx
+            self._step_toward_hover()
+            self._hover_timer.start()
+
+    def leaveEvent(self, e):
+        self._hover_target = -1
+        self._hover_timer.stop()
+        super().leaveEvent(e)
+
+    def _step_toward_hover(self):
+        if self._hover_target < 0:
+            self._hover_timer.stop()
+            return
+        current = round(self._target)
+        if self._hover_target > current:
+            self._scroll_to(min(current + 1, self._hover_target))
+        elif self._hover_target < current:
+            self._scroll_to(max(current - 1, self._hover_target))
+        else:
+            self._hover_timer.stop()
 
     def mousePressEvent(self, e):
         if e.button() == Qt.MouseButton.LeftButton:
