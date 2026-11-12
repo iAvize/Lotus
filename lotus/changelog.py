@@ -8,6 +8,8 @@ from __future__ import annotations
 from . import db
 
 RELEASES = [
+    {"version": "0.1.0-beta.34", "date": "2026-11-11",
+     "notes": ["Orb carousel fixed - full-width strip across the top of the content area"]},
     {"version": "0.1.0-beta.33", "date": "2026-11-11",
      "notes": ["Orb-style scrollable nav replaces left panel (test - easily reverted)"]},
     {"version": "0.1.0-beta.32", "date": "2026-11-11",

@@ -292,8 +292,12 @@ class MainWindow(QMainWindow):
         self.orb_nav.set_sections(
             [(k, b.text()) for k, b in self._section_buttons.items()])
         self.orb_nav.section_selected.connect(self._show_section)
-        layout.addWidget(self.orb_nav)
-        layout.addWidget(self.section_stack, 1)
+        section_col = QVBoxLayout()
+        section_col.setContentsMargins(0, 0, 0, 0)
+        section_col.setSpacing(6)
+        section_col.addWidget(self.orb_nav)
+        section_col.addWidget(self.section_stack, 1)
+        layout.addLayout(section_col, 1)
 
         self._refresh_scan_targets()
         self._on_scan_mode_changed()
