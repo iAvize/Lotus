@@ -263,6 +263,10 @@ class MainWindow(QMainWindow):
         # content_layout.addWidget(self._build_center(), 1) ---
         self.clock_box = ClockBox(self.left_panel)
         self.clock_box.show()
+        self.version_label = QLabel(f"v{__version__}", self.left_panel)
+        self.version_label.setStyleSheet(
+            f"color: {theme.current()['subtitle']}; font-size: 10px;")
+        self.version_label.show()
         QTimer.singleShot(0, self._position_clock)
 
     def _position_clock(self):
@@ -271,6 +275,12 @@ class MainWindow(QMainWindow):
         x = self.left_panel.width() - self.clock_box.width() - 16
         self.clock_box.move(max(x, 8), 12)
         self.clock_box.raise_()
+        if hasattr(self, "version_label"):
+            self.version_label.adjustSize()
+            self.version_label.move(
+                self.left_panel.width() - self.version_label.width() - 12,
+                self.left_panel.height() - self.version_label.height() - 8)
+            self.version_label.raise_()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)

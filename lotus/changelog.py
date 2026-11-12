@@ -8,6 +8,8 @@ from __future__ import annotations
 from . import db
 
 RELEASES = [
+    {"version": "0.1.0-beta.48", "date": "2026-11-12",
+     "notes": ["Scrub cadence 0.4s per orb", "Version label restored bottom-right"]},
     {"version": "0.1.0-beta.47", "date": "2026-11-12",
      "notes": ["Clock box: centered time/day/week, regional long-date only", "Scrub cadence 1.4s per orb"]},
     {"version": "0.1.0-beta.46", "date": "2026-11-12",
