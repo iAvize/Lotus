@@ -8,6 +8,8 @@ from __future__ import annotations
 from . import db
 
 RELEASES = [
+    {"version": "0.1.0-beta.55", "date": "2026-11-12",
+     "notes": ["Orb inner fill + inner ring now use theme colors"]},
     {"version": "0.1.0-beta.54", "date": "2026-11-12",
      "notes": ["Orbs + clock box recolor instantly on theme change"]},
     {"version": "0.1.0-beta.53", "date": "2026-11-12",

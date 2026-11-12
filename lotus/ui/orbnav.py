@@ -153,7 +153,8 @@ class OrbNav(QWidget):
             fade = max(0.16, 1.0 - d * 0.24)
             edge = QColor(accent)
             edge.setAlpha(int(255 * fade) if active else int(140 * fade))
-            fill = QColor(18, 10, 34, int(215 * fade))
+            fill = QColor(T["nav_bg"])
+            fill.setAlpha(int(215 * fade))
             if active:
                 glow = QColor(accent)
                 glow.setAlpha(48)
@@ -164,8 +165,8 @@ class OrbNav(QWidget):
             p.setBrush(fill)
             p.setPen(QPen(edge, 2.6 if active else 1.5))
             p.drawEllipse(int(x - r), int(cy - r), int(r * 2), int(r * 2))
-            inner = QColor(accent)
-            inner.setAlpha(int(80 * fade))
+            inner = QColor(T["ring2"])
+            inner.setAlpha(int(110 * fade))
             p.setBrush(Qt.BrushStyle.NoBrush)
             p.setPen(QPen(inner, 1.1))
             ir = r * 0.6
