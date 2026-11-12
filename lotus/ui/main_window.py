@@ -20,6 +20,7 @@ from PyQt6.QtWidgets import (
 
 from .. import __version__, ai, changelog, config, db, devbox, github, personality, platform_info, scanner, updater, usage
 from .orbnav import OrbNav
+from .clockbox import ClockBox
 from . import theme
 from .settings_dialog import SettingsDialog
 from .widgets import MatrixRain, ReactorWidget
@@ -260,6 +261,20 @@ class MainWindow(QMainWindow):
         content_layout.addWidget(self.left_panel, 1)
         # --- REACTOR PANEL REMOVED FOR ORB-NAV TEST (kept for revert):
         # content_layout.addWidget(self._build_center(), 1) ---
+        self.clock_box = ClockBox(self.left_panel)
+        self.clock_box.show()
+        QTimer.singleShot(0, self._position_clock)
+
+    def _position_clock(self):
+        if not hasattr(self, "clock_box"):
+            return
+        x = self.left_panel.width() - self.clock_box.width() - 16
+        self.clock_box.move(max(x, 8), 12)
+        self.clock_box.raise_()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._position_clock()
 
     def _section_label(self, text: str) -> QLabel:
         label = QLabel(text)
@@ -350,6 +365,8 @@ class MainWindow(QMainWindow):
             self._section_col.setStretch(3, 1)
             self._menu_title.show()
             self._header_title.hide()
+            self.clock_box.set_compact(False)
+            self._position_clock()
             for button in self._section_buttons.values():
                 button.setChecked(False)
             return
@@ -360,6 +377,8 @@ class MainWindow(QMainWindow):
         self._section_col.setStretch(3, 0)
         self._menu_title.hide()
         self._header_title.show()
+        self.clock_box.set_compact(True)
+        self._position_clock()
         self.section_stack.show()
         self.section_stack.setCurrentIndex(self._section_pages[key])
         if hasattr(self, "orb_nav"):
