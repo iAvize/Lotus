@@ -264,8 +264,7 @@ class MainWindow(QMainWindow):
 
     def _build_left_panel(self) -> QFrame:
         panel = QFrame()
-        panel.setObjectName("panel")
-        # --- WAS panel.setFixedWidth(620); full width for centered orb nav ---
+        panel.setObjectName("")  # transparent - orb nav floats over the Matrix bg
         layout = QHBoxLayout(panel)
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(10)
@@ -296,8 +295,10 @@ class MainWindow(QMainWindow):
         section_col = QVBoxLayout()
         section_col.setContentsMargins(0, 0, 0, 0)
         section_col.setSpacing(6)
+        section_col.addStretch(1)
         section_col.addWidget(self.orb_nav)
-        section_col.addWidget(self.section_stack, 1)
+        section_col.addStretch(1)
+        section_col.addWidget(self.section_stack, 3)
         layout.addLayout(section_col, 1)
 
         self._refresh_scan_targets()

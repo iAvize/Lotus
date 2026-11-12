@@ -1,8 +1,8 @@
 """Orb nav - Nexus-style carousel of overlapping circular nodes.
 
-Drag left/right across the orbs to scrub through sections; the nearest
-orb snaps to center on release. Clicking an orb jumps to it. The active
-orb glows, grows, and shows its label underneath.
+Hover-scrub: moving the cursor over the orbs slides the carousel - each
+orb under the cursor drifts to center. Clicking jumps to that orb. The
+centered orb glows, grows, and every orb shows its section label below.
 """
 from __future__ import annotations
 
@@ -18,15 +18,16 @@ from . import theme
 class OrbNav(QWidget):
     section_selected = pyqtSignal(str)
 
-    R = 44
+    R = 46
     SPACING = 62
-    STRIP_H = 120
+    STRIP_H = 150
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setFixedHeight(self.STRIP_H)
         self.setMinimumWidth(0)
-        self.setCursor(Qt.CursorShape.OpenHandCursor)
+        self.setMouseTracking(True)
+        self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
         self._sections: list[tuple[str, str]] = []
         self._pos = 0.0
         self._target = 0.0
@@ -63,6 +64,8 @@ class OrbNav(QWidget):
 
     def _scroll_to(self, idx: float):
         idx = max(0.0, min(len(self._sections) - 1, idx))
+        if abs(idx - self._target) < 0.01:
+            return
         self._target = idx
         self._anim.stop()
         self._anim.setStartValue(self._pos)
@@ -76,9 +79,18 @@ class OrbNav(QWidget):
         cx = self.width() / 2
         for i in range(len(self._sections)):
             ox = cx + (i - self._pos) * self.SPACING
-            if (x - ox) ** 2 + (y - 56) ** 2 <= self.R ** 2:
+            if (x - ox) ** 2 + (y - 62) ** 2 <= self.R ** 2:
                 return i
         return -1
+
+    def mouseMoveEvent(self, e):
+        if self._dragging:
+            delta = e.position().x() - self._drag_x
+            self._set_pos(self._drag_pos - delta / self.SPACING)
+            return
+        idx = self._orb_at(e.position().x(), e.position().y())
+        if idx >= 0:
+            self._scroll_to(idx)
 
     def mousePressEvent(self, e):
         if e.button() != Qt.MouseButton.LeftButton:
@@ -87,19 +99,11 @@ class OrbNav(QWidget):
         self._drag_x = e.position().x()
         self._drag_pos = self._pos
         self._anim.stop()
-        self.setCursor(Qt.CursorShape.ClosedHandCursor)
-
-    def mouseMoveEvent(self, e):
-        if not self._dragging:
-            return
-        delta = e.position().x() - self._drag_x
-        self._set_pos(self._drag_pos - delta / self.SPACING)
 
     def mouseReleaseEvent(self, e):
         if not self._dragging:
             return
         self._dragging = False
-        self.setCursor(Qt.CursorShape.OpenHandCursor)
         if abs(e.position().x() - self._drag_x) < 6:
             idx = self._orb_at(e.position().x(), e.position().y())
             if idx >= 0:
@@ -114,7 +118,7 @@ class OrbNav(QWidget):
     def _star(self, p, x, y, r, color):
         pts = []
         for i in range(8):
-            a = 3.14159 * i / 4 - 3.14159 / 2
+            a = math.pi * i / 4 - math.pi / 2
             rr = r if i % 2 == 0 else r * 0.38
             pts.append(QPointF(x + rr * math.cos(a), y + rr * math.sin(a)))
         p.setBrush(color)
@@ -126,7 +130,7 @@ class OrbNav(QWidget):
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         T = self._theme
         cx = self.width() / 2
-        cy = 56
+        cy = 62
         accent = QColor(T["accent"])
         order = sorted(range(len(self._sections)),
                        key=lambda i: abs(i - self._pos), reverse=True)
@@ -135,36 +139,39 @@ class OrbNav(QWidget):
             x = cx + (i - self._pos) * self.SPACING
             d = abs(i - self._pos)
             active = d < 0.5
-            r = self.R * (1.08 if active else 0.9)
+            r = self.R * (1.1 if active else 0.88)
             if x < -r or x > self.width() + r:
                 continue
-            fade = max(0.22, 1.0 - d * 0.22)
+            fade = max(0.16, 1.0 - d * 0.24)
             edge = QColor(accent)
-            edge.setAlpha(int(255 * fade) if active else int(150 * fade))
-            fill = QColor(18, 10, 34, int(225 * fade))
+            edge.setAlpha(int(255 * fade) if active else int(140 * fade))
+            fill = QColor(18, 10, 34, int(215 * fade))
             if active:
                 glow = QColor(accent)
-                glow.setAlpha(44)
+                glow.setAlpha(48)
                 p.setBrush(glow)
                 p.setPen(Qt.PenStyle.NoPen)
-                p.drawEllipse(int(x - r - 10), int(cy - r - 10),
-                              int((r + 10) * 2), int((r + 10) * 2))
+                p.drawEllipse(int(x - r - 11), int(cy - r - 11),
+                              int((r + 11) * 2), int((r + 11) * 2))
             p.setBrush(fill)
-            p.setPen(QPen(edge, 2.6 if active else 1.6))
+            p.setPen(QPen(edge, 2.6 if active else 1.5))
             p.drawEllipse(int(x - r), int(cy - r), int(r * 2), int(r * 2))
             inner = QColor(accent)
-            inner.setAlpha(int(90 * fade))
+            inner.setAlpha(int(80 * fade))
             p.setBrush(Qt.BrushStyle.NoBrush)
             p.setPen(QPen(inner, 1.1))
-            ir = r * 0.62
+            ir = r * 0.6
             p.drawEllipse(int(x - ir), int(cy - ir), int(ir * 2), int(ir * 2))
             dot = QColor(T["accent_light"] if active else T["subtitle"])
             dot.setAlpha(int(255 * fade))
             self._star(p, x, cy, 7 if active else 5, dot)
-            if active:
-                f = QFont(); f.setPixelSize(11); f.setBold(True)
+            if d < 2.2:
+                f = QFont(); f.setPixelSize(11 if active else 9)
+                f.setBold(active)
                 p.setFont(f)
-                p.setPen(QColor(T["accent_light"]))
-                p.drawText(int(x - 80), cy + int(r) + 10, 160, 20,
+                lc = QColor(T["accent_light"] if active else T["subtitle"])
+                lc.setAlpha(int(235 * fade))
+                p.setPen(lc)
+                p.drawText(int(x - 90), cy + int(r) + 12, 180, 20,
                            Qt.AlignmentFlag.AlignCenter, title)
         p.end()
