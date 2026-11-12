@@ -8,6 +8,8 @@ from __future__ import annotations
 from . import db
 
 RELEASES = [
+    {"version": "0.1.0-beta.40", "date": "2026-11-11",
+     "notes": ["Fixed orb click crash - legacy nav buttons kept alive for revert"]},
     {"version": "0.1.0-beta.39", "date": "2026-11-11",
      "notes": ["Orb menu mode: dead-center hover-scrub orbs, click focused orb to open its panel"]},
     {"version": "0.1.0-beta.38", "date": "2026-11-11",
