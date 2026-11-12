@@ -18,9 +18,9 @@ from . import theme
 class OrbNav(QWidget):
     section_selected = pyqtSignal(str)
 
-    R = 46
-    SPACING = 68
-    STRIP_H = 150
+    R = 52
+    SPACING = 78
+    STRIP_H = 160
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -34,7 +34,7 @@ class OrbNav(QWidget):
         self._press_x = -1.0
         self._hover_target = -1
         self._hover_timer = QTimer(self)
-        self._hover_timer.setInterval(800)
+        self._hover_timer.setInterval(950)
         self._hover_timer.timeout.connect(self._step_toward_hover)
         self._anim = QPropertyAnimation(self, b"scrollPos", self)
         self._anim.setDuration(600)
@@ -78,7 +78,7 @@ class OrbNav(QWidget):
         cx = self.width() / 2
         for i in range(len(self._sections)):
             ox = cx + (i - self._pos) * self.SPACING
-            if (x - ox) ** 2 + (y - 62) ** 2 <= self.R ** 2:
+            if (x - ox) ** 2 + (y - 68) ** 2 <= self.R ** 2:
                 return i
         return -1
 
@@ -138,7 +138,7 @@ class OrbNav(QWidget):
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         T = self._theme
         cx = self.width() / 2
-        cy = 62
+        cy = 68
         accent = QColor(T["accent"])
         order = sorted(range(len(self._sections)),
                        key=lambda i: abs(i - self._pos), reverse=True)
