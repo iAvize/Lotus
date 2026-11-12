@@ -19,7 +19,7 @@ class OrbNav(QWidget):
     section_selected = pyqtSignal(str)
 
     R = 46
-    SPACING = 62
+    SPACING = 68
     STRIP_H = 150
 
     def __init__(self, parent=None):
@@ -165,13 +165,13 @@ class OrbNav(QWidget):
             dot = QColor(T["accent_light"] if active else T["subtitle"])
             dot.setAlpha(int(255 * fade))
             self._star(p, x, cy, 7 if active else 5, dot)
-            if d < 2.2:
-                f = QFont(); f.setPixelSize(11 if active else 9)
+            if d < 1.8:
+                f = QFont(); f.setPixelSize(11 if active else 8)
                 f.setBold(active)
                 p.setFont(f)
                 lc = QColor(T["accent_light"] if active else T["subtitle"])
-                lc.setAlpha(int(235 * fade))
+                lc.setAlpha(int(235 * fade * fade))
                 p.setPen(lc)
-                p.drawText(int(x - 90), cy + int(r) + 12, 180, 20,
+                p.drawText(int(x - 65), cy + int(r) + 12, 130, 20,
                            Qt.AlignmentFlag.AlignCenter, title)
         p.end()

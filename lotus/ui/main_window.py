@@ -295,7 +295,7 @@ class MainWindow(QMainWindow):
         section_col = QVBoxLayout()
         section_col.setContentsMargins(0, 0, 0, 0)
         section_col.setSpacing(6)
-        section_col.addStretch(1)
+        section_col.addStretch(2)
         section_col.addWidget(self.orb_nav)
         section_col.addStretch(1)
         section_col.addWidget(self.section_stack, 3)
