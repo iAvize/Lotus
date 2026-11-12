@@ -253,7 +253,8 @@ class MainWindow(QMainWindow):
         root.addWidget(content, 1)
 
         self.left_panel = self._build_left_panel()
-        content_layout.addWidget(self.left_panel)
+        # --- REACTOR PANEL REMOVED FOR ORB-NAV TEST (kept for revert):
+        # content_layout.addWidget(self.left_panel) ---
         content_layout.addWidget(self._build_center(), 1)
 
     def _section_label(self, text: str) -> QLabel:
