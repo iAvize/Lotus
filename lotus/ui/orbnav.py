@@ -18,9 +18,9 @@ from . import theme
 class OrbNav(QWidget):
     section_selected = pyqtSignal(str)
 
-    R = 52
-    SPACING = 78
-    STRIP_H = 160
+    R = 64
+    SPACING = 100
+    STRIP_H = 190
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -78,7 +78,7 @@ class OrbNav(QWidget):
         cx = self.width() / 2
         for i in range(len(self._sections)):
             ox = cx + (i - self._pos) * self.SPACING
-            if (x - ox) ** 2 + (y - 68) ** 2 <= self.R ** 2:
+            if (x - ox) ** 2 + (y - 80) ** 2 <= self.R ** 2:
                 return i
         return -1
 
@@ -138,7 +138,7 @@ class OrbNav(QWidget):
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         T = self._theme
         cx = self.width() / 2
-        cy = 68
+        cy = 80
         accent = QColor(T["accent"])
         order = sorted(range(len(self._sections)),
                        key=lambda i: abs(i - self._pos), reverse=True)
@@ -172,7 +172,7 @@ class OrbNav(QWidget):
             p.drawEllipse(int(x - ir), int(cy - ir), int(ir * 2), int(ir * 2))
             dot = QColor(T["accent_light"] if active else T["subtitle"])
             dot.setAlpha(int(255 * fade))
-            self._star(p, x, cy, 7 if active else 5, dot)
+            self._star(p, x, cy, 9 if active else 6, dot)
             if d < 1.8:
                 f = QFont(); f.setPixelSize(11 if active else 8)
                 f.setBold(active)
