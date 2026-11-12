@@ -71,9 +71,6 @@ class OrbNav(QWidget):
         self._anim.setStartValue(self._pos)
         self._anim.setEndValue(idx)
         self._anim.start()
-        nearest = round(idx)
-        if 0 <= nearest < len(self._sections):
-            self.section_selected.emit(self._sections[nearest][0])
 
     def _orb_at(self, x: float, y: float) -> int:
         cx = self.width() / 2
@@ -107,7 +104,10 @@ class OrbNav(QWidget):
         if abs(e.position().x() - self._drag_x) < 6:
             idx = self._orb_at(e.position().x(), e.position().y())
             if idx >= 0:
-                self._scroll_to(idx)
+                if abs(idx - self._pos) < 0.5:
+                    self.section_selected.emit(self._sections[idx][0])
+                else:
+                    self._scroll_to(idx)
                 return
         self._scroll_to(round(self._pos))
 

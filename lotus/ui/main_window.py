@@ -288,22 +288,25 @@ class MainWindow(QMainWindow):
         nav_layout.addStretch(1)
 
         # --- OLD LEFT-PANEL NAV (kept for revert): layout.addWidget(nav) ---
+        self._legacy_nav = nav  # keep the old nav alive for revert
         self.orb_nav = OrbNav()
         self.orb_nav.set_sections(
             [(k, b.text()) for k, b in self._section_buttons.items()])
         self.orb_nav.section_selected.connect(self._show_section)
-        section_col = QVBoxLayout()
-        section_col.setContentsMargins(0, 0, 0, 0)
-        section_col.setSpacing(6)
-        section_col.addStretch(2)
-        section_col.addWidget(self.orb_nav)
-        section_col.addStretch(1)
-        section_col.addWidget(self.section_stack, 3)
-        layout.addLayout(section_col, 1)
+        self._section_col = QVBoxLayout()
+        self._section_col.setContentsMargins(0, 0, 0, 0)
+        self._section_col.setSpacing(6)
+        self._section_col.addStretch(1)
+        self._section_col.addWidget(self.orb_nav)
+        self._section_col.addStretch(1)
+        self._section_col.addWidget(self.section_stack, 3)
+        layout.addLayout(self._section_col, 1)
 
         self._refresh_scan_targets()
         self._on_scan_mode_changed()
-        self._show_section("ask")
+        # ORB MENU MODE: orbs dead-center, no panel shown until one is clicked
+        self._open_section = None
+        self.section_stack.hide()
         return panel
 
     def _register_section(self, key: str, title: str, page: QWidget, nav_layout: QVBoxLayout):
@@ -319,8 +322,20 @@ class MainWindow(QMainWindow):
     def _show_section(self, key: str):
         if key not in self._section_pages:
             return
+        if getattr(self, "_open_section", None) == key:
+            self._open_section = None
+            self.section_stack.hide()
+            self._section_col.setStretch(0, 1)
+            self._section_col.setStretch(2, 1)
+            for button in self._section_buttons.values():
+                button.setChecked(False)
+            return
+        self._open_section = key
         for section_key, button in self._section_buttons.items():
             button.setChecked(section_key == key)
+        self._section_col.setStretch(0, 0)
+        self._section_col.setStretch(2, 0)
+        self.section_stack.show()
         self.section_stack.setCurrentIndex(self._section_pages[key])
         if hasattr(self, "orb_nav"):
             self.orb_nav.set_active(key)
