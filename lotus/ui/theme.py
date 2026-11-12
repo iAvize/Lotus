@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from string import Template
 
-THEME_NAMES = ("purple", "blue", "red", "pink", "green")
+THEME_NAMES = ("purple", "blue", "red", "pink", "green", "orange")
 DEFAULT_THEME = "purple"
 
 # Each palette recolors every tinted surface so switching feels native, not
@@ -114,6 +114,27 @@ PALETTES: dict[str, dict[str, str]] = {
         "ring3": "#059669", "ring4": "#a7f3d0",
         "glow1": "#10b981", "glow2": "#065f46",
         "core1": "#d1fae5", "core2": "#10b981", "core3": "#065f46",
+    },
+    "orange": {
+        "window": "#140a05", "header_bg": "rgba(38, 20, 10, 190)",
+        "header_border": "#5f3a1e", "title": "#ffedd5", "subtitle": "#fb923c",
+        "btn_bg": "#472410", "btn_border": "#8a4a2a", "btn_hover_bg": "#663a22",
+        "btn_hover_border": "#f97316",
+        "disabled_text": "#8b7464", "disabled_bg": "#2c1a0d", "disabled_border": "#503020",
+        "accent": "#ea580c", "accent_hover": "#f97316", "accent_light": "#fb923c",
+        "danger_bg": "#7f2d0f",
+        "nav_bg": "#2c150a", "nav_text": "#ffd9b8", "nav_checked_bg": "#5a2e16",
+        "input_bg": "#26150a", "input_border": "#6e3a1f", "selection": "#ea580c",
+        "panel_bg": "rgba(43, 25, 13, 225)", "panel_border": "#75492a",
+        "section": "#fdba74", "status_text": "#ffe8d1",
+        "table_bg": "#261408", "table_alt": "#361e10", "table_border": "#5e3a20",
+        "gridline": "#47301a", "headerview_text": "#ffd0a0",
+        "tab_bg": "#381e10", "tab_text": "#efb98a", "tab_selected_bg": "#5a2e16",
+        "scroll_bg": "#180f07", "scroll_handle": "#a86a32",
+        "rain": "#f97316", "ring1": "#f97316", "ring2": "#fdba74",
+        "ring3": "#ea580c", "ring4": "#fed7aa",
+        "glow1": "#f97316", "glow2": "#7f2d0f",
+        "core1": "#ffedd5", "core2": "#f97316", "core3": "#7f2d0f",
     },
 }
 
