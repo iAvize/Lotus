@@ -12,7 +12,7 @@ from __future__ import annotations
 import math
 
 from PyQt6.QtCore import QEasingCurve, QPointF, QPropertyAnimation, Qt, QRectF, QTimer, pyqtProperty, pyqtSignal
-from PyQt6.QtGui import QBrush, QColor, QFont, QPainter, QPen, QRadialGradient
+from PyQt6.QtGui import QBrush, QColor, QFont, QPainter, QPen, QPolygonF, QRadialGradient
 from PyQt6.QtWidgets import QWidget
 
 from . import theme
@@ -157,16 +157,15 @@ class OrbNav(QWidget):
 
     # -- paint: the Grid's node, themed --------------------------------------
     def _draw_core_icon(self, p, x, y, s, colour):
-        """The Grid 'interface' core icon - concentric orbit + diamond core."""
-        p.setPen(QPen(colour, 1.8, Qt.PenStyle.SolidLine,
-                      Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
-        p.setBrush(Qt.BrushStyle.NoBrush)
-        p.drawEllipse(QRectF(x - s * 0.95, y - s * 0.95, s * 1.9, s * 1.9))
-        p.drawArc(QRectF(x - s * 0.6, y - s * 0.6, s * 1.2, s * 1.2),
-                  30 * 16, 250 * 16)
+        """Diamond star at the orb's centre."""
+        pts = []
+        for i in range(8):
+            a = math.pi * i / 4 - math.pi / 2
+            rr = s if i % 2 == 0 else s * 0.38
+            pts.append(QPointF(x + rr * math.cos(a), y + rr * math.sin(a)))
         p.setBrush(QBrush(colour))
         p.setPen(Qt.PenStyle.NoPen)
-        p.drawEllipse(QRectF(x - s * 0.17, y - s * 0.17, s * 0.34, s * 0.34))
+        p.drawPolygon(QPolygonF(pts))
 
     def paintEvent(self, event):
         p = QPainter(self)
