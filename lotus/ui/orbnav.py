@@ -208,7 +208,7 @@ class OrbNav(QWidget):
             p.drawArc(orbit, start + 180 * 16, 34 * 16)
             # diamond-type core icon
             self._draw_core_icon(
-                p, x, y, r * 0.40,
+                p, x, y, r * 0.16,
                 _col(accent_light if sel else accent, 255 * a))
             # label under every orb
             if a > 0.12:
