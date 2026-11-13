@@ -1,18 +1,27 @@
-"""Orb nav - Nexus-style carousel of overlapping circular nodes.
+"""Orb nav - Grid-style carousel of overlapping circular nodes.
 
-Hover-scrub: moving the cursor over the orbs slides the carousel - each
-orb under the cursor drifts to center. Clicking jumps to that orb. The
-centered orb glows, grows, and every orb shows its section label below.
+Ported from the Grid's menu carousel: neighbours arc down and shrink as
+they recede, the focused orb glows with a radial bloom, every orb wears
+a rotating tick ring on its outer orbit and the core/diamond icon at its
+centre. Hover over an orb to slide it to centre; click the centred orb
+to open its panel. Fully theme-driven - every painted colour comes from
+the active palette so theme swaps repaint instantly.
 """
 from __future__ import annotations
 
 import math
 
-from PyQt6.QtCore import QEasingCurve, QPointF, QPropertyAnimation, Qt, QTimer, pyqtProperty, pyqtSignal
-from PyQt6.QtGui import QColor, QFont, QPainter, QPen, QPolygonF
+from PyQt6.QtCore import QEasingCurve, QPointF, QPropertyAnimation, Qt, QRectF, QTimer, pyqtProperty, pyqtSignal
+from PyQt6.QtGui import QBrush, QColor, QFont, QPainter, QPen, QRadialGradient
 from PyQt6.QtWidgets import QWidget
 
 from . import theme
+
+
+def _col(hex_or_qcolor, alpha=255):
+    c = QColor(hex_or_qcolor)
+    c.setAlpha(int(alpha))
+    return c
 
 
 class OrbNav(QWidget):
@@ -20,7 +29,7 @@ class OrbNav(QWidget):
 
     R = 80
     SPACING = 130
-    STRIP_H = 215
+    STRIP_H = 230
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -39,7 +48,16 @@ class OrbNav(QWidget):
         self._anim = QPropertyAnimation(self, b"scrollPos", self)
         self._anim.setDuration(600)
         self._anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self._t = 0.0
+        self._tick = QTimer(self)
+        self._tick.setInterval(50)
+        self._tick.timeout.connect(self._on_tick)
+        self._tick.start()
         self._theme = theme.current()
+
+    def _on_tick(self):
+        self._t += 0.05
+        self.update()
 
     def _get_pos(self) -> float:
         return self._pos
@@ -64,6 +82,18 @@ class OrbNav(QWidget):
         self._theme = theme.current()
         self.update()
 
+    # -- geometry: the Grid's arc -------------------------------------------
+    def _geom(self):
+        return self.width() / 2, 105, self.SPACING
+
+    def _node(self, i):
+        cx, cy, sp = self._geom()
+        off = i - self._pos
+        return (cx + off * sp,
+                cy + abs(off) * sp * 0.10,
+                self.R * max(0.55, 1.0 - 0.10 * abs(off)),
+                max(0.0, 1.0 - 0.27 * abs(off)))
+
     def _scroll_to(self, idx: float):
         idx = max(0.0, min(len(self._sections) - 1, idx))
         if abs(idx - self._target) < 0.01:
@@ -75,16 +105,18 @@ class OrbNav(QWidget):
         self._anim.start()
 
     def _orb_at(self, x: float, y: float) -> int:
-        cx = self.width() / 2
+        best, bd = -1, 1e9
         for i in range(len(self._sections)):
-            ox = cx + (i - self._pos) * self.SPACING
-            if (x - ox) ** 2 + (y - 100) ** 2 <= self.R ** 2:
-                return i
-        return -1
+            nx, ny, r, a = self._node(i)
+            d = ((x - nx) ** 2 + (y - ny) ** 2) ** 0.5
+            if a > 0.05 and d <= r * 1.1 and d < bd:
+                best, bd = i, d
+        return best
 
+    # -- input ---------------------------------------------------------------
     def mouseMoveEvent(self, e):
-        # HOVER SCRUB: the carousel steps one orb at a time toward whatever
-        # orb the cursor rests on - slow enough to stop on the one you want.
+        # HOVER SCRUB: instant first step, then a paced walk toward the orb
+        # the cursor rests on.
         idx = self._orb_at(e.position().x(), e.position().y())
         if idx < 0:
             return
@@ -123,64 +155,69 @@ class OrbNav(QWidget):
         if idx >= 0 and abs(idx - self._pos) < 0.5:
             self.section_selected.emit(self._sections[idx][0])
 
-    def _star(self, p, x, y, r, color):
-        pts = []
-        for i in range(8):
-            a = math.pi * i / 4 - math.pi / 2
-            rr = r if i % 2 == 0 else r * 0.38
-            pts.append(QPointF(x + rr * math.cos(a), y + rr * math.sin(a)))
-        p.setBrush(color)
+    # -- paint: the Grid's node, themed --------------------------------------
+    def _draw_core_icon(self, p, x, y, s, colour):
+        """The Grid 'interface' core icon - concentric orbit + diamond core."""
+        p.setPen(QPen(colour, 1.8, Qt.PenStyle.SolidLine,
+                      Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.drawEllipse(QRectF(x - s * 0.95, y - s * 0.95, s * 1.9, s * 1.9))
+        p.drawArc(QRectF(x - s * 0.6, y - s * 0.6, s * 1.2, s * 1.2),
+                  30 * 16, 250 * 16)
+        p.setBrush(QBrush(colour))
         p.setPen(Qt.PenStyle.NoPen)
-        p.drawPolygon(QPolygonF(pts))
+        p.drawEllipse(QRectF(x - s * 0.17, y - s * 0.17, s * 0.34, s * 0.34))
 
     def paintEvent(self, event):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         T = self._theme
-        cx = self.width() / 2
-        cy = 100
-        accent = QColor(T["accent"])
+        accent, accent_light, dim = T["accent"], T["accent_light"], T["subtitle"]
         order = sorted(range(len(self._sections)),
-                       key=lambda i: abs(i - self._pos), reverse=True)
+                       key=lambda i: -abs(i - self._pos))
         for i in order:
             _k, title = self._sections[i]
-            x = cx + (i - self._pos) * self.SPACING
-            d = abs(i - self._pos)
-            active = d < 0.5
-            r = self.R * (1.1 if active else 0.88)
-            if x < -r or x > self.width() + r:
+            x, y, r, a = self._node(i)
+            if a <= 0.02 or r < 2 or x < -r * 2 or x > self.width() + r * 2:
                 continue
-            fade = max(0.16, 1.0 - d * 0.24)
-            edge = QColor(accent)
-            edge.setAlpha(int(255 * fade) if active else int(140 * fade))
-            fill = QColor(T["nav_bg"])
-            fill.setAlpha(int(215 * fade))
-            if active:
-                glow = QColor(accent)
-                glow.setAlpha(48)
-                p.setBrush(glow)
+            sel = i == round(self._pos)
+            # radial bloom behind the focused orb
+            if sel:
+                g = QRadialGradient(x, y, r * 2.0)
+                g.setColorAt(0.0, _col(accent, 120 * a))
+                g.setColorAt(0.55, _col(accent, 40 * a))
+                g.setColorAt(1.0, _col(accent, 0))
                 p.setPen(Qt.PenStyle.NoPen)
-                p.drawEllipse(int(x - r - 11), int(cy - r - 11),
-                              int((r + 11) * 2), int((r + 11) * 2))
-            p.setBrush(fill)
-            p.setPen(QPen(edge, 2.6 if active else 1.5))
-            p.drawEllipse(int(x - r), int(cy - r), int(r * 2), int(r * 2))
-            inner = QColor(T["ring2"])
-            inner.setAlpha(int(110 * fade))
+                p.setBrush(QBrush(g))
+                p.drawEllipse(QRectF(x - r * 2, y - r * 2, r * 4, r * 4))
+            # orb body - radial gradient, theme-tinted
+            g = QRadialGradient(x, y - r * 0.3, r * 1.05)
+            g.setColorAt(0.0, _col(T["panel_border"], (110 if sel else 70) * a))
+            g.setColorAt(1.0, _col(T["nav_bg"], (190 if sel else 140) * a))
+            p.setBrush(QBrush(g))
+            p.setPen(QPen(_col(accent_light if sel else accent,
+                               (255 if sel else 170) * a),
+                          2.4 if sel else 1.3))
+            p.drawEllipse(QRectF(x - r, y - r, r * 2, r * 2))
+            # radial tick ring on the outer orbit - rotating arc pair
             p.setBrush(Qt.BrushStyle.NoBrush)
-            p.setPen(QPen(inner, 1.1))
-            ir = r * 0.6
-            p.drawEllipse(int(x - ir), int(cy - ir), int(ir * 2), int(ir * 2))
-            dot = QColor(T["accent_light"] if active else T["subtitle"])
-            dot.setAlpha(int(255 * fade))
-            self._star(p, x, cy, 11 if active else 7, dot)
-            if d < 1.8:
-                f = QFont(); f.setPixelSize(11 if active else 8)
-                f.setBold(active)
+            p.setPen(QPen(_col(accent_light if sel else accent,
+                               (150 if sel else 70) * a), 1.6 if sel else 1.2))
+            orbit = QRectF(x - r * 1.14, y - r * 1.14, r * 2.28, r * 2.28)
+            start = int(((self._t * 40) % 360) * 16)
+            p.drawArc(orbit, start, 70 * 16)
+            p.drawArc(orbit, start + 180 * 16, 34 * 16)
+            # diamond-type core icon
+            self._draw_core_icon(
+                p, x, y, r * 0.40,
+                _col(accent_light if sel else accent, 255 * a))
+            # label under every orb
+            if a > 0.12:
+                f = QFont()
+                f.setPixelSize(12 if sel else 9)
+                f.setBold(sel)
                 p.setFont(f)
-                lc = QColor(T["accent_light"] if active else T["subtitle"])
-                lc.setAlpha(int(235 * fade * fade))
-                p.setPen(lc)
-                p.drawText(int(x - 65), cy + int(r) + 12, 130, 20,
+                p.setPen(_col(accent_light if sel else dim, 235 * a))
+                p.drawText(int(x - 90), int(y + r + 10), 180, 20,
                            Qt.AlignmentFlag.AlignCenter, title)
         p.end()

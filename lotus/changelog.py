@@ -8,6 +8,8 @@ from __future__ import annotations
 from . import db
 
 RELEASES = [
+    {"version": "0.1.0-beta.57", "date": "2026-11-13",
+     "notes": ["Grid-style orbs: arc layout, gradient bodies, rotating tick rings, diamond core icon"]},
     {"version": "0.1.0-beta.56", "date": "2026-11-12",
      "notes": ["Orange theme added - sixth palette"]},
     {"version": "0.1.0-beta.55", "date": "2026-11-12",
