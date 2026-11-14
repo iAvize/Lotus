@@ -10,15 +10,15 @@ import threading
 from pathlib import Path
 
 import psutil
-from PyQt6.QtCore import QEasingCurve, QPropertyAnimation, QStandardPaths, Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QIcon
+from PyQt6.QtCore import QEasingCurve, QPropertyAnimation, QStandardPaths, Qt, QTimer, QUrl, pyqtSignal
+from PyQt6.QtGui import QDesktopServices, QIcon
 from PyQt6.QtWidgets import (
     QApplication, QComboBox, QFrame, QHBoxLayout, QHeaderView, QLabel,
     QLineEdit, QLabel, QMainWindow, QMessageBox, QProgressDialog, QPushButton, QScrollBar, QSlider, QStackedWidget, QTableWidget,
     QFileDialog, QTableWidgetItem, QTabWidget, QTextBrowser, QTextEdit, QVBoxLayout, QWidget,
 )
 
-from .. import __version__, ai, audit, changelog, config, db, devbox, github, personality, platform_info, scanner, updater, usage
+from .. import __version__, ai, audit, changelog, config, db, devbox, github, personality, platform_info, privacy, scanner, updater, usage
 from .orbnav import OrbNav
 from .clockbox import ClockBox
 from . import theme
@@ -313,6 +313,7 @@ class MainWindow(QMainWindow):
         self._register_section("scan", "File / Repo Scan", self._build_scan_page(), nav_layout)
         self._register_section("devbox", "Devbox", self._build_devbox_page(), nav_layout)
         self._register_section("audit", "Project Audit", self._build_audit_page(), nav_layout)
+        self._register_section("privacy", "Privacy Sweep", self._build_privacy_page(), nav_layout)
         self._register_section("personality", "Personality", self._build_personality_page(), nav_layout)
         self._register_section("patchnotes", "Patch Notes", self._build_patchnotes_page(), nav_layout)
         nav_layout.addStretch(1)
@@ -606,22 +607,32 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.experiments_table, 1)
         return page
 
+    def _launch_gate(self, title: str, desc: str) -> QWidget:
+        """Teaser page for Pro features in beta - 'Available at launch'
+        plus what the feature does. Removed when Pro goes live."""
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.addWidget(self._section_label(title))
+        layout.addStretch(1)
+        body = QLabel(f"{desc}\n\nAvailable at launch.")
+        body.setObjectName("subtitle")
+        body.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        body.setWordWrap(True)
+        layout.addWidget(body)
+        layout.addStretch(1)
+        return page
+
     def _build_audit_page(self) -> QWidget:
+        if not audit.pro_enabled():
+            return self._launch_gate(
+                "Project Audit",
+                "Audit real codebases, validate findings with AI, review "
+                "proposed patches, and apply approved changes - all verified "
+                "in Lotus's own lab before anything touches your project.")
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setSpacing(8)
         layout.addWidget(self._section_label("Project Audit"))
-
-        if not audit.pro_enabled():
-            lock = QLabel("Project Audit is a Lotus Pro feature.\n\n"
-                          "Audit real codebases, validate findings with AI,\n"
-                          "review proposed patches, and apply approved changes.")
-            lock.setObjectName("subtitle")
-            lock.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            layout.addStretch(1)
-            layout.addWidget(lock)
-            layout.addStretch(1)
-            return page
 
         row = QHBoxLayout()
         pick = QPushButton("Choose project…")
@@ -722,6 +733,134 @@ class MainWindow(QMainWindow):
             self._patch_diff = ""
         except Exception as exc:  # noqa: BLE001
             self._show_error(exc)
+
+    def _build_privacy_page(self) -> QWidget:
+        if not audit.pro_enabled():
+            return self._launch_gate(
+                "Privacy Sweep",
+                "Find where your email and phone have leaked or been sold, "
+                "then Lotus drafts legal removal requests to data brokers on "
+                "your behalf and tracks each opt-out until it is confirmed.")
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setSpacing(8)
+        layout.addWidget(self._section_label("Privacy Sweep"))
+
+        row = QHBoxLayout()
+        self.privacy_email = QLineEdit()
+        self.privacy_email.setPlaceholderText("email@you.com")
+        self.privacy_email.setText(db.get_setting("privacy_email"))
+        self.privacy_name = QLineEdit()
+        self.privacy_name.setPlaceholderText("Full name (for requests)")
+        self.privacy_name.setText(db.get_setting("privacy_name"))
+        self.privacy_phone = QLineEdit()
+        self.privacy_phone.setPlaceholderText("Phone (optional)")
+        self.privacy_phone.setText(db.get_setting("privacy_phone"))
+        save = QPushButton("Save")
+        save.clicked.connect(self._privacy_save)
+        scan = QPushButton("Scan breaches")
+        scan.clicked.connect(self._privacy_scan)
+        row.addWidget(self.privacy_email, 2)
+        row.addWidget(self.privacy_name, 2)
+        row.addWidget(self.privacy_phone, 1)
+        row.addWidget(save)
+        row.addWidget(scan)
+        layout.addLayout(row)
+
+        self.privacy_results = QTextEdit()
+        self.privacy_results.setReadOnly(True)
+        self.privacy_results.setMaximumHeight(80)
+        self.privacy_results.setPlaceholderText("Breach scan results appear here.")
+        layout.addWidget(self.privacy_results)
+
+        self.broker_table = QTableWidget(0, 3)
+        self.broker_table.setHorizontalHeaderLabels(["Data broker", "Status", "Opt-out page"])
+        self.broker_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self.broker_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        self.broker_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.broker_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        layout.addWidget(self.broker_table, 1)
+        self._privacy_reload_brokers()
+
+        btns = QHBoxLayout()
+        for label, fn in (("Draft removal email", self._privacy_draft),
+                          ("Open opt-out page", self._privacy_optout),
+                          ("Mark requested", lambda: self._privacy_mark("requested")),
+                          ("Mark confirmed", lambda: self._privacy_mark("confirmed"))):
+            b = QPushButton(label)
+            b.clicked.connect(fn)
+            btns.addWidget(b)
+        btns.addStretch(1)
+        self.privacy_status = QLabel("")
+        self.privacy_status.setObjectName("subtitle")
+        btns.addWidget(self.privacy_status)
+        layout.addLayout(btns)
+        return page
+
+    def _privacy_reload_brokers(self):
+        state = privacy.load_state()
+        self.broker_table.setRowCount(len(privacy.BROKERS))
+        for i, br in enumerate(privacy.BROKERS):
+            self.broker_table.setItem(i, 0, QTableWidgetItem(br[0]))
+            status = state.get(br[0], "not started").replace("_", " ")
+            self.broker_table.setItem(i, 1, QTableWidgetItem(status))
+            self.broker_table.setItem(i, 2, QTableWidgetItem(privacy.optout_url(br)))
+
+    def _privacy_save(self):
+        db.set_setting("privacy_email", self.privacy_email.text().strip())
+        db.set_setting("privacy_name", self.privacy_name.text().strip())
+        db.set_setting("privacy_phone", self.privacy_phone.text().strip())
+        self.privacy_status.setText("Saved.")
+
+    def _privacy_scan(self):
+        email = self.privacy_email.text().strip()
+        if not email:
+            self.privacy_results.setPlainText("Enter an email address first.")
+            return
+        self._privacy_save()
+        self.privacy_results.setPlainText("Scanning breach databases…")
+        self._run_bg(lambda: privacy.breach_check(email), on_ok=self._privacy_scan_done)
+
+    def _privacy_scan_done(self, res: dict):
+        if "error" in res:
+            self.privacy_results.setPlainText(f"Scan unavailable: {res['error']}")
+            return
+        breaches, pastes = res["breaches"], res["pastes"]
+        if not breaches and not pastes:
+            self.privacy_results.setPlainText("No known breaches or pastes for this email.")
+        else:
+            self.privacy_results.setPlainText(
+                f"Found in {len(breaches)} breaches, {pastes} pastes.\n"
+                + ", ".join(breaches[:40]))
+
+    def _privacy_selected(self):
+        row = self.broker_table.currentRow()
+        if row < 0:
+            self.privacy_status.setText("Select a broker row first.")
+            return None
+        return privacy.BROKERS[row]
+
+    def _privacy_draft(self):
+        br = self._privacy_selected()
+        if not br:
+            return
+        self._privacy_save()
+        QDesktopServices.openUrl(QUrl(privacy.removal_mailto(
+            self.privacy_name.text(), self.privacy_email.text(),
+            self.privacy_phone.text(), br)))
+
+    def _privacy_optout(self):
+        br = self._privacy_selected()
+        if br:
+            QDesktopServices.openUrl(QUrl(privacy.optout_url(br)))
+
+    def _privacy_mark(self, status: str):
+        br = self._privacy_selected()
+        if not br:
+            return
+        privacy.mark(br[0], status)
+        self._privacy_reload_brokers()
+        self.privacy_status.setText(f"{br[0]}: {status.replace('_', ' ')}")
 
     def _build_personality_page(self) -> QWidget:
         page = QWidget()
