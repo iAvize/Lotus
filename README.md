@@ -7,12 +7,11 @@ Lotus is a Windows-first cybersecurity assistant built for SOC analysis, AppSec,
 - Gemini-powered chat with local conversation memory
 - SQLite memory/request/activity logs (browsable in DB tools)
 - `remember:` / `forget` memory commands
-- Read-only OS info checks only after you approve the specific question
+- Read-only OS info checks
 - Folder virus scan with quarantine instead of deletion
 - Scan target dropdown for Downloads and detected local/external drives
 - GitHub repository code scan for risky patterns
 - GitHub release update check and self-update staging (Windows + macOS)
-- Local-only secrets in `config/api_keys.json` (never committed)
 
 ## Install on Windows
 
@@ -29,7 +28,7 @@ Python 3.11–3.14 is preferred when running from source.
 
 ## Run on macOS
 
-1. Clone or download this repository.
+1. Download this repository.
 2. Run `bash scripts/setup_macos.sh` to create `.venv` and install requirements.
 3. Launch with `scripts/Run-Lotus.command` (double-clickable in Finder) or `.venv/bin/python -m lotus`.
 4. On first launch, Lotus prompts for your own Gemini API key.
