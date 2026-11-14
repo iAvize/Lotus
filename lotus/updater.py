@@ -52,7 +52,17 @@ def check_for_update(repo: str = REPO, timeout: int = 15) -> dict | None:
         return None
 
     assets = data.get("assets") or []
-    zip_assets = [a for a in assets if str(a.get("name", "")).lower().endswith(".zip")]
+
+    def wrong_platform(name: str) -> bool:
+        if sys.platform == "win32":
+            return "macos" in name or ".mac." in name or "-mac" in name
+        if sys.platform == "darwin":
+            return "windows" in name or name.endswith("beta.zip")
+        return False
+
+    zip_assets = [a for a in assets
+                  if str(a.get("name", "")).lower().endswith(".zip")
+                  and not wrong_platform(str(a.get("name", "")).lower())]
 
     def asset_score(asset: dict) -> int:
         name = str(asset.get("name", "")).lower()
@@ -141,11 +151,14 @@ _APPLY_NAMES = ("_apply_lotus_update.bat", "_apply_lotus_update.sh")
 def pending_update(app_dir: Path | None = None) -> Path | None:
     """The apply-script a previous 'update on relaunch' left behind. Its mere
     existence means an update is owed before the app may be used."""
-    app_dir = app_dir or config.BASE_DIR
-    for name in _APPLY_NAMES:
-        candidate = app_dir / name
-        if candidate.exists():
-            return candidate
+    dirs = [app_dir or config.BASE_DIR]
+    if config.memory_dir() not in dirs:
+        dirs.append(config.memory_dir())
+    for directory in dirs:
+        for name in _APPLY_NAMES:
+            candidate = directory / name
+            if candidate.exists():
+                return candidate
     return None
 
 
@@ -156,6 +169,16 @@ def run_pending(app_dir: Path | None = None) -> bool:
         return False
     _launch_helper(script)
     return True
+
+
+def _frozen_app_bundle() -> Path | None:
+    """Path of the .app bundle we're running inside, if frozen on macOS."""
+    if not (sys.platform == "darwin" and getattr(sys, "frozen", False)):
+        return None
+    for parent in (Path(sys.executable).resolve(), *Path(sys.executable).resolve().parents):
+        if parent.suffix == ".app":
+            return parent
+    return None
 
 
 def _relaunch_line() -> str:
@@ -173,7 +196,11 @@ def apply_update(zip_path: Path, app_dir: Path | None = None,
     files after exit. launch=False defers the swap to the next app start —
     app.py checks pending_update() before showing any UI."""
     app_dir = (app_dir or config.BASE_DIR).resolve()
-    staging = app_dir / "_lotus_update_staging"
+    bundle = _frozen_app_bundle()
+    if bundle:
+        staging = config.memory_dir() / "_lotus_update_staging"
+    else:
+        staging = app_dir / "_lotus_update_staging"
     if staging.exists():
         import shutil
         shutil.rmtree(staging, ignore_errors=True)
@@ -205,6 +232,27 @@ def apply_update(zip_path: Path, app_dir: Path | None = None,
             'del "%~f0"\r\n',
             encoding="utf-8",
         )
+    elif bundle:
+        # Frozen .app: the zip ships a whole bundle — swap it wholesale.
+        script = config.memory_dir() / "_apply_lotus_update.sh"
+        script.write_text(
+            "#!/bin/sh\n"
+            f'SRC="{src}"\n'
+            f'APP="{bundle}"\n'
+            "sleep 2\n"
+            'NEWAPP="$(find "$SRC" -maxdepth 2 -type d -name "*.app" | head -1)"\n'
+            'if [ -z "$NEWAPP" ] && [ -d "$SRC/Contents" ]; then NEWAPP="$SRC"; fi\n'
+            'if [ -n "$NEWAPP" ]; then\n'
+            '  rm -rf "$APP" && ditto "$NEWAPP" "$APP"\n'
+            "else\n"
+            '  rsync -a --delete --exclude config --exclude memory "$SRC"/ "$APP"/\n'
+            "fi\n"
+            'rm -rf "$SRC"\n'
+            'open "$APP"\n'
+            'rm -f "$0"\n',
+            encoding="utf-8",
+        )
+        script.chmod(0o755)
     else:
         script = app_dir / "_apply_lotus_update.sh"
         script.write_text(

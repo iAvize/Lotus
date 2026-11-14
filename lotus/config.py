@@ -17,10 +17,19 @@ def get_base_dir() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
+def _data_root() -> Path:
+    """Where config/ and memory/ live. A frozen macOS app must not write
+    inside its own bundle (updates replace it wholesale), so it keeps data
+    under ~/Library/Application Support/Lotus."""
+    if sys.platform == "darwin" and getattr(sys, "frozen", False):
+        return Path.home() / "Library" / "Application Support" / "Lotus"
+    return BASE_DIR
+
+
 BASE_DIR = get_base_dir()
-CONFIG_DIR = BASE_DIR / "config"
+CONFIG_DIR = _data_root() / "config"
 CONFIG_FILE = CONFIG_DIR / "api_keys.json"
-MEMORY_DIR = BASE_DIR / "memory"
+MEMORY_DIR = _data_root() / "memory"
 DB_PATH = MEMORY_DIR / "lotus_ai.db"
 QUARANTINE_DIR = MEMORY_DIR / "quarantine"
 UPDATE_DIR = MEMORY_DIR / "updates"

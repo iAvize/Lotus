@@ -22,7 +22,7 @@ _LOG_PATH: Path | None = None
 def log_path() -> Path:
     global _LOG_PATH
     if _LOG_PATH is None:
-        mem = Path(config.BASE_DIR) / "memory"
+        mem = config.memory_dir()
         mem.mkdir(parents=True, exist_ok=True)
         _LOG_PATH = mem / LOG_NAME
     return _LOG_PATH

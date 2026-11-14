@@ -130,7 +130,9 @@ def _candidate_dbs() -> list[Path]:
     """Every reachable Lotus install DB on this machine."""
     home = Path.home()
     cands = [
+        config.memory_dir() / "lotus_ai.db",
         Path(config.BASE_DIR) / "memory" / "lotus.db",
+        home / "Library" / "Application Support" / "Lotus" / "memory" / "lotus_ai.db",
         home / "Lotus Beta" / "memory" / "lotus.db",
         home / "Downloads" / "Lotus Beta" / "memory" / "lotus.db",
         home / "Downloads" / "Lotus Source" / "memory" / "lotus.db",

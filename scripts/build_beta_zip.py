@@ -1,14 +1,17 @@
-"""Build Windows beta and source zip artifacts for Lotus.
+"""Build beta and source zip artifacts for Lotus.
 
-Run from the repo root:  python scripts/build_beta_zip.py
+Run from the repo root:  python scripts/build_beta_zip.py [--mac]
 
-`Lotus Beta.zip` is the PUBLIC package — compiled app only, no source code
-or developer assets. Editable/developer content ships exclusively inside the
-AES-locked trusted-developers zip.
+Windows builds `Lotus Beta.zip` (compiled app only, no source code) plus
+`Lotus Source.zip`. On macOS, `Lotus Beta Mac.zip` packages the PyInstaller
+`Lotus Beta.app` bundle — build it first with scripts/lotus_beta_mac.spec.
 """
 from __future__ import annotations
 
 import json
+import shutil
+import subprocess
+import sys
 import zipfile
 from pathlib import Path
 
@@ -76,7 +79,30 @@ def build_source() -> Path:
     return out
 
 
+def build_mac() -> Path:
+    """macOS beta package: the whole Lotus Beta.app bundle. ditto (not
+    zipfile) so symlinks and resource metadata inside the app survive."""
+    DIST.mkdir(exist_ok=True)
+    out = DIST / "Lotus Beta Mac.zip"
+    app = DIST / "Lotus Beta.app"
+    if not app.is_dir():
+        raise SystemExit("dist/Lotus Beta.app not found — build it first: "
+                         "pyinstaller --clean --noconfirm scripts/lotus_beta_mac.spec")
+    out.unlink(missing_ok=True)
+    subprocess.run(
+        ["ditto", "-ck", "--sequesterRsrc", "--keepParent",
+         str(app), str(out)],
+        check=True,
+    )
+    print(f"built {out.relative_to(ROOT)}")
+    return out
+
+
 def main() -> None:
+    if "--mac" in sys.argv or (sys.platform == "darwin" and "--win" not in sys.argv):
+        build_mac()
+        build_source()
+        return
     build_app()
     build_source()
 
