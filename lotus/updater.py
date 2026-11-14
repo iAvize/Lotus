@@ -116,10 +116,10 @@ def _zip_source_dir(zip_path: Path, extract_dir: Path) -> Path:
 
 def _launch_bat(bat: Path) -> None:
     creationflags = 0
-    if hasattr(subprocess, "DETACHED_PROCESS"):
-        creationflags |= subprocess.DETACHED_PROCESS
-    if hasattr(subprocess, "CREATE_NEW_PROCESS_GROUP"):
-        creationflags |= subprocess.CREATE_NEW_PROCESS_GROUP
+    for flag in ("DETACHED_PROCESS", "CREATE_NEW_PROCESS_GROUP",
+                 "CREATE_NO_WINDOW"):
+        if hasattr(subprocess, flag):
+            creationflags |= getattr(subprocess, flag)
     subprocess.Popen(["cmd.exe", "/c", str(bat)], cwd=str(bat.parent),
                      creationflags=creationflags, close_fds=True)
 
@@ -177,7 +177,7 @@ def apply_update(zip_path: Path, app_dir: Path | None = None,
         "timeout /t 2 /nobreak >nul\r\n"
         'robocopy "%SRC%" "%DST%" /E /R:1 /W:1 /NFL /NDL /NJH /NJS /XD .git memory config .venv venv __pycache__ dist /XF api_keys.json lotus_ai.db >nul\r\n'
         'if exist "%SRC%" rmdir /s /q "%SRC%"\r\n'
-        'if exist "%DST%\\Run-Lotus.bat" start "" "%DST%\\Run-Lotus.bat"\r\n'
+        'if exist "%DST%\\Lotus Beta.exe" (start "" "%DST%\\Lotus Beta.exe") else (if exist "%DST%\\Run-Lotus.bat" start "" "%DST%\\Run-Lotus.bat")\r\n'
         'del "%~f0"\r\n',
         encoding="utf-8",
     )

@@ -8,6 +8,8 @@ from __future__ import annotations
 from . import db
 
 RELEASES = [
+    {"version": "0.1.0-beta.60", "date": "2026-11-13",
+     "notes": ["Update restart no longer shows a console window", "Update relaunches the exe directly"]},
     {"version": "0.1.0-beta.59", "date": "2026-11-13",
      "notes": ["Diamond star shrunk to subtle size"]},
     {"version": "0.1.0-beta.58", "date": "2026-11-13",
