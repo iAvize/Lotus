@@ -29,7 +29,7 @@ class OrbNav(QWidget):
 
     R = 80
     SPACING = 130
-    STRIP_H = 230
+    STRIP_H = 340
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -84,7 +84,7 @@ class OrbNav(QWidget):
 
     # -- geometry: the Grid's arc -------------------------------------------
     def _geom(self):
-        return self.width() / 2, 105, self.SPACING
+        return self.width() / 2, 165, self.SPACING
 
     def _node(self, i):
         cx, cy, sp = self._geom()
