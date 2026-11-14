@@ -45,7 +45,7 @@ Herdr SOC's `Lotus-Workbench`. It is where Lotus experiments on itself:
 4. Read-only system info checks are allowed after install; OS-level changes still require explicit user permission in the UI flow.
 5. Bump `version.json` and `lotus/__init__.py` together for beta changes.
 6. After editing Python, run `python scripts/check.py`.
-7. Releases are Windows zips built by `python scripts/build_beta_zip.py`.
+7. Releases are Windows zips built by `python scripts/build_beta_zip.py`; on macOS the same script (`--mac`) builds the `Lotus Beta Mac.zip` and `Lotus Beta.dmg` installer.
 8. After any change, keep all copies in sync and report where updates landed:
    `Lotus Source` (Windows: `C:\Users\akaAv\Lotus Source`; macOS:
    `~/Downloads/Lotus Source`), `C:\Users\akaAv\Lotus Beta`, the rebuilt

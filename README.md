@@ -26,14 +26,18 @@ Lotus is a Windows-first cybersecurity assistant built for SOC analysis, AppSec,
 
 Python 3.11–3.14 is preferred when running from source.
 
-## Run on macOS
+## Install on macOS
 
-1. Download this repository.
-2. Run `bash scripts/setup_macos.sh` to create `.venv` and install requirements.
-3. Launch with `scripts/Run-Lotus.command` (double-clickable in Finder) or `.venv/bin/python -m lotus`.
-4. On first launch, Lotus prompts for your own Gemini API key.
+1. Download `Lotus.Beta.Mac.dmg` from GitHub Releases.
+2. Open the dmg and drag `Lotus Beta.app` onto the Applications folder.
+3. First launch only: macOS may block the app since it is not notarized — right-click `Lotus Beta` → **Open** → **Open** (or System Settings → Privacy & Security → **Open Anyway**).
+4. On first launch, Lotus prompts for your own Gemini API key and links to Google AI Studio where you can create one.
 
-On macOS the updater swaps files via a staged POSIX shell script, "run at login" uses a per-user LaunchAgent, and the Lotus-Lab devbox falls back to a **local lab mode** (staging commands run directly on the Mac) when no `Lotus-Lab` VirtualBox VM is registered.
+`Lotus.Beta.Mac.zip` holds the same `Lotus Beta.app` as a plain zip for scriptable installs and in-app updates.
+
+Prefer source? Clone the repo, run `bash scripts/setup_macos.sh`, then double-click `scripts/Run-Lotus.command` or run `.venv/bin/python -m lotus`.
+
+On macOS the updater swaps the `.app` via a staged POSIX shell script, "run at login" uses a per-user LaunchAgent, and the Lotus-Lab devbox falls back to a **local lab mode** (staging commands run directly on the Mac) when no `Lotus-Lab` VirtualBox VM is registered.
 
 ## Scanner safety
 

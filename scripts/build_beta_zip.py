@@ -13,6 +13,7 @@ import shutil
 import subprocess
 import sys
 import zipfile
+from tempfile import TemporaryDirectory
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -30,6 +31,14 @@ LAUNCHER_BAT = (
     "powershell -NoProfile -ExecutionPolicy Bypass -File \"%~dp0scripts\\Run-Lotus.ps1\"\r\n"
     "exit /b %ERRORLEVEL%\r\n"
 )
+
+LAUNCHER_COMMAND = """#!/bin/bash
+cd "$(dirname "$0")"
+if [ ! -x .venv/bin/python ]; then
+  bash scripts/setup_macos.sh || exit 1
+fi
+exec .venv/bin/python -m lotus
+"""
 
 
 def version() -> str:
@@ -75,6 +84,49 @@ def build_source() -> Path:
             arcname = Path("Lotus Source") / path.relative_to(ROOT)
             zf.write(path, arcname.as_posix())
         zf.writestr("Lotus Source/Lotus Source.bat", LAUNCHER_BAT)
+        info = zipfile.ZipInfo("Lotus Source/Lotus Source.command")
+        info.external_attr = 0o755 << 16
+        zf.writestr(info, LAUNCHER_COMMAND)
+    print(f"built {out.relative_to(ROOT)}")
+    return out
+
+
+DMG_README = """LOTUS BETA — macOS INSTALL
+==========================
+
+1. Drag "Lotus Beta.app" onto the Applications folder.
+
+2. FIRST LAUNCH ONLY: macOS may say the developer can't be
+   verified (Lotus isn't notarized yet). Fix it either way:
+     a) Right-click the app → Open → Open, or
+     b) System Settings → Privacy & Security → "Open Anyway".
+
+3. On first launch Lotus asks for your own Gemini API key
+   (free at Google AI Studio — the app links you there).
+
+Your data lives in ~/Library/Application Support/Lotus —
+updating the app never touches your keys or memories.
+"""
+
+
+def build_dmg() -> Path:
+    """Drag-to-Applications installer dmg for macOS end users."""
+    app = DIST / "Lotus Beta.app"
+    if not app.is_dir():
+        raise SystemExit("dist/Lotus Beta.app not found — build it first: "
+                         "pyinstaller --clean --noconfirm scripts/lotus_beta_mac.spec")
+    out = DIST / "Lotus Beta.dmg"
+    out.unlink(missing_ok=True)
+    with TemporaryDirectory() as tmp:
+        stage = Path(tmp)
+        shutil.copytree(app, stage / app.name, symlinks=True)
+        (stage / "Applications").symlink_to("/Applications")
+        (stage / "READ ME FIRST.txt").write_text(DMG_README, encoding="utf-8")
+        subprocess.run(
+            ["hdiutil", "create", "-volname", "Lotus Beta",
+             "-srcfolder", str(stage), "-ov", "-format", "UDZO", str(out)],
+            check=True, capture_output=True,
+        )
     print(f"built {out.relative_to(ROOT)}")
     return out
 
@@ -101,6 +153,7 @@ def build_mac() -> Path:
 def main() -> None:
     if "--mac" in sys.argv or (sys.platform == "darwin" and "--win" not in sys.argv):
         build_mac()
+        build_dmg()
         build_source()
         return
     build_app()
