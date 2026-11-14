@@ -44,7 +44,7 @@ class MatrixRain(QWidget):
         pal = theme.current()
         painter.fillRect(self.rect(), QColor(pal["window"]))
 
-        font = QFont("Consolas", 11)
+        font = QFont(["Consolas", "Menlo", "monospace"], 11)
         painter.setFont(font)
         char_w = 18
         trail = 7
@@ -130,7 +130,8 @@ class ReactorWidget(QWidget):
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawEllipse(core_rect)
 
-        font = QFont("Segoe UI", max(54, int(w * 0.22)), QFont.Weight.Bold)
+        font = QFont(["Segoe UI", "SF Pro Text", "Helvetica Neue", "sans-serif"],
+                     max(54, int(w * 0.22)), QFont.Weight.Bold)
         painter.setFont(font)
         painter.setPen(QColor(250, 245, 255))
         painter.drawText(core_rect, Qt.AlignmentFlag.AlignCenter, "L")

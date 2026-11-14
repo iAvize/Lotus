@@ -261,9 +261,9 @@ class MainWindow(QMainWindow):
         content_layout.addWidget(self.left_panel, 1)
         # --- REACTOR PANEL REMOVED FOR ORB-NAV TEST (kept for revert):
         # content_layout.addWidget(self._build_center(), 1) ---
-        self.clock_box = ClockBox(self.left_panel)
+        self.clock_box = ClockBox(self.canvas)
         self.clock_box.show()
-        self.version_label = QLabel(f"v{__version__}", self.left_panel)
+        self.version_label = QLabel(f"v{__version__}", self.canvas)
         self.version_label.setStyleSheet(
             f"color: {theme.current()['subtitle']}; font-size: 10px;")
         self.version_label.show()
@@ -272,14 +272,14 @@ class MainWindow(QMainWindow):
     def _position_clock(self):
         if not hasattr(self, "clock_box"):
             return
-        x = self.left_panel.width() - self.clock_box.width() - 16
-        self.clock_box.move(max(x, 8), 12)
+        x = self.canvas.width() - self.clock_box.width() - 8
+        self.clock_box.move(max(x, 8), self.header.height() + 8)
         self.clock_box.raise_()
         if hasattr(self, "version_label"):
             self.version_label.adjustSize()
             self.version_label.move(
-                self.left_panel.width() - self.version_label.width() - 12,
-                self.left_panel.height() - self.version_label.height() - 8)
+                self.canvas.width() - self.version_label.width() - 8,
+                self.canvas.height() - self.version_label.height() - 8)
             self.version_label.raise_()
 
     def resizeEvent(self, event):
