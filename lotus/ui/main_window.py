@@ -15,10 +15,10 @@ from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
     QApplication, QComboBox, QFrame, QHBoxLayout, QHeaderView, QLabel,
     QLineEdit, QLabel, QMainWindow, QMessageBox, QProgressDialog, QPushButton, QScrollBar, QSlider, QStackedWidget, QTableWidget,
-    QTableWidgetItem, QTabWidget, QTextBrowser, QTextEdit, QVBoxLayout, QWidget,
+    QFileDialog, QTableWidgetItem, QTabWidget, QTextBrowser, QTextEdit, QVBoxLayout, QWidget,
 )
 
-from .. import __version__, ai, changelog, config, db, devbox, github, personality, platform_info, scanner, updater, usage
+from .. import __version__, ai, audit, changelog, config, db, devbox, github, personality, platform_info, scanner, updater, usage
 from .orbnav import OrbNav
 from .clockbox import ClockBox
 from . import theme
@@ -312,6 +312,7 @@ class MainWindow(QMainWindow):
         self._register_section("logs", "Logs / Memory", self._build_logs_page(), nav_layout)
         self._register_section("scan", "File / Repo Scan", self._build_scan_page(), nav_layout)
         self._register_section("devbox", "Devbox", self._build_devbox_page(), nav_layout)
+        self._register_section("audit", "Project Audit", self._build_audit_page(), nav_layout)
         self._register_section("personality", "Personality", self._build_personality_page(), nav_layout)
         self._register_section("patchnotes", "Patch Notes", self._build_patchnotes_page(), nav_layout)
         nav_layout.addStretch(1)
@@ -604,6 +605,123 @@ class MainWindow(QMainWindow):
         self.experiments_table = self._make_table(["Time", "Kind", "Result", "Secs", "Goal"])
         layout.addWidget(self.experiments_table, 1)
         return page
+
+    def _build_audit_page(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setSpacing(8)
+        layout.addWidget(self._section_label("Project Audit"))
+
+        if not audit.pro_enabled():
+            lock = QLabel("Project Audit is a Lotus Pro feature.\n\n"
+                          "Audit real codebases, validate findings with AI,\n"
+                          "review proposed patches, and apply approved changes.")
+            lock.setObjectName("subtitle")
+            lock.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            layout.addStretch(1)
+            layout.addWidget(lock)
+            layout.addStretch(1)
+            return page
+
+        row = QHBoxLayout()
+        pick = QPushButton("Choose project…")
+        pick.clicked.connect(self._audit_pick)
+        self.audit_path_label = QLabel("No project selected")
+        self.audit_path_label.setObjectName("subtitle")
+        self.audit_btn = QPushButton("Audit project")
+        self.audit_btn.clicked.connect(self._run_audit)
+        row.addWidget(pick)
+        row.addWidget(self.audit_path_label, 1)
+        row.addWidget(self.audit_btn)
+        layout.addLayout(row)
+
+        self.audit_table = QTableWidget(0, 4)
+        self.audit_table.setHorizontalHeaderLabels(["Severity", "File", "Line", "Finding"])
+        self.audit_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
+        self.audit_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.audit_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        layout.addWidget(self.audit_table, 1)
+
+        mid = QHBoxLayout()
+        self.patch_btn = QPushButton("Suggest patch")
+        self.patch_btn.clicked.connect(self._suggest_patch)
+        mid.addWidget(self.patch_btn)
+        mid.addStretch(1)
+        self.audit_status = QLabel("")
+        self.audit_status.setObjectName("subtitle")
+        mid.addWidget(self.audit_status)
+        layout.addLayout(mid)
+
+        self.patch_view = QTextEdit()
+        self.patch_view.setReadOnly(True)
+        self.patch_view.setPlaceholderText(
+            "Select a finding and choose Suggest patch - the proposed diff appears here for review.")
+        layout.addWidget(self.patch_view, 1)
+
+        actions = QHBoxLayout()
+        actions.addStretch(1)
+        self.apply_btn = QPushButton("Approve + apply")
+        self.apply_btn.clicked.connect(self._apply_patch)
+        reject = QPushButton("Reject")
+        reject.clicked.connect(self.patch_view.clear)
+        actions.addWidget(self.apply_btn)
+        actions.addWidget(reject)
+        layout.addLayout(actions)
+        return page
+
+    def _audit_pick(self):
+        folder = QFileDialog.getExistingDirectory(self, "Choose project folder", str(Path.home()))
+        if folder:
+            self._audit_path = Path(folder)
+            self.audit_path_label.setText(folder)
+
+    def _run_audit(self):
+        path = getattr(self, "_audit_path", None)
+        if not path:
+            QMessageBox.information(self, "Project Audit", "Choose a project folder first.")
+            return
+        self.audit_status.setText("Auditing…")
+        self._run_bg(lambda: audit.audit(path), on_ok=self._audit_done)
+
+    def _audit_done(self, report: dict):
+        self._audit_findings = report.get("audit_findings", [])
+        self.audit_status.setText(
+            f"{report['files_scanned']} files · {len(self._audit_findings)} findings")
+        self.audit_table.setRowCount(len(self._audit_findings))
+        for i, f in enumerate(self._audit_findings):
+            for col, val in enumerate((f["severity"].upper(), f["file"],
+                                       str(f.get("line") or ""), f["title"])):
+                self.audit_table.setItem(i, col, QTableWidgetItem(val))
+
+    def _suggest_patch(self):
+        row = self.audit_table.currentRow()
+        if row < 0 or not getattr(self, "_audit_findings", None):
+            self.audit_status.setText("Select a finding first.")
+            return
+        finding = self._audit_findings[row]
+        self.audit_status.setText("Drafting patch…")
+        self._run_bg(lambda: audit.propose_patch(self._audit_path, finding),
+                     on_ok=self._patch_ready)
+
+    def _patch_ready(self, diff: str):
+        self._patch_diff = diff
+        self.patch_view.setPlainText(diff)
+        self.audit_status.setText("Review the patch, then Approve or Reject.")
+
+    def _apply_patch(self):
+        diff = getattr(self, "_patch_diff", "")
+        if not diff.strip():
+            self.audit_status.setText("No patch to apply.")
+            return
+        try:
+            files = audit.apply_diff(self._audit_path, diff)
+            self.audit_status.setText(
+                f"Applied {', '.join(files) or 'nothing'} - backup in .lotus-backup/")
+            db.log("info", "audit", f"patch applied: {files}")
+            self.patch_view.clear()
+            self._patch_diff = ""
+        except Exception as exc:  # noqa: BLE001
+            self._show_error(exc)
 
     def _build_personality_page(self) -> QWidget:
         page = QWidget()
