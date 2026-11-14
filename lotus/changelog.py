@@ -8,6 +8,8 @@ from __future__ import annotations
 from . import db
 
 RELEASES = [
+    {"version": "0.1.0-beta.61", "date": "2026-11-13",
+     "notes": ["macOS support: run from source on Mac, LaunchAgent login item, POSIX self-update, local devbox lab mode", "Mac scanner targets (Downloads/Home/volumes) and codesign checks on Mach-O binaries"]},
     {"version": "0.1.0-beta.60", "date": "2026-11-13",
      "notes": ["Update restart no longer shows a console window", "Update relaunches the exe directly"]},
     {"version": "0.1.0-beta.59", "date": "2026-11-13",

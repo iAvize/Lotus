@@ -52,3 +52,16 @@ gotchas hit during bring-up:
   LotusCloud (proxy + usage + billing) is the planned seam for launch.
 - Streaming SSE is not yet implemented — RN needs a polyfill or the
   `@google/genai` SDK's stream; non-streaming replies are still fast.
+
+## TestFlight shipping checklist (pre-baked)
+
+- **Apple processing delay**: after upload, builds take 15 min – a few
+  hours to appear in TestFlight. Submit once, then wait — do NOT re-run
+  builds or retry uploads while Apple processes.
+- **Build numbers**: `eas.json` preview + production profiles have
+  `autoIncrement: true`; if building manually, bump `buildNumber` in
+  `app.json` EVERY upload — Apple rejects duplicates.
+- **Privacy/infoPlist**: `app.json → ios.infoPlist` pre-declares the
+  standard permission strings (we request none — camera/location/
+  tracking are declared unused). If a permission is ever added, update
+  its description there or Apple auto-rejects.

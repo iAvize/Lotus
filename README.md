@@ -1,40 +1,50 @@
-# Lotus — Cybersecurity AI (Windows Beta)
+# Lotus — Cybersecurity AI (Windows + macOS Beta)
 
-Lotus is a Windows cybersecurity assistant built for SOC analysis, AppSec, DevSecOps, secure coding, malware awareness, and general research/help. It is currently in **public beta**.
+Lotus is a Windows-first cybersecurity assistant built for SOC analysis, AppSec, DevSecOps, secure coding, malware awareness, and general research/help. It is currently in **public beta** and also runs from source on macOS.
 ## Beta features
 
 - Purple reactor + Matrix-rain desktop UI
 - Gemini-powered chat with local conversation memory
 - SQLite memory/request/activity logs (browsable in DB tools)
 - `remember:` / `forget` memory commands
-- Read-only OS info checks
+- Read-only OS info checks only after you approve the specific question
 - Folder virus scan with quarantine instead of deletion
 - Scan target dropdown for Downloads and detected local/external drives
 - GitHub repository code scan for risky patterns
-- GitHub release update check and Windows self-update staging
+- GitHub release update check and self-update staging (Windows + macOS)
+- Local-only secrets in `config/api_keys.json` (never committed)
 
 ## Install on Windows
 
 1. Download `Lotus.Beta.exe` from GitHub Releases.
 2. Run `Lotus.Beta.exe`.
-3. First run creates a `Lotus Beta` desktop shortcut
+3. First run creates a `Lotus Beta` desktop shortcut with the app icon.
 4. On first launch, Lotus prompts for your own Gemini API key and links to Google AI Studio where you can create one.
 
-`Lotus.Beta.zip` exe + docs only. This is for people who want a zipped version of the release over the exe only release.
+`Lotus.Beta.zip` is the scriptable beta package for users who prefer running from source/scripts. After extracting `Lotus Beta`, run `Lotus Beta.bat` only if you are not using the exe.
 
-`Lotus.Source.Trusted.Developers.zip` is trusted developer access only and is password-protected.
+`Lotus.Source.Trusted.Developers.zip` is trusted developer access only and is password-protected. It includes the source code and the Windows app.
 
 Python 3.11–3.14 is preferred when running from source.
+
+## Run on macOS
+
+1. Clone or download this repository.
+2. Run `bash scripts/setup_macos.sh` to create `.venv` and install requirements.
+3. Launch with `scripts/Run-Lotus.command` (double-clickable in Finder) or `.venv/bin/python -m lotus`.
+4. On first launch, Lotus prompts for your own Gemini API key.
+
+On macOS the updater swaps files via a staged POSIX shell script, "run at login" uses a per-user LaunchAgent, and the Lotus-Lab devbox falls back to a **local lab mode** (staging commands run directly on the Mac) when no `Lotus-Lab` VirtualBox VM is registered.
 
 ## Scanner safety
 
 Lotus beta does **not** delete files. Suspicious files are moved to:
 
 ```text
-memory\quarantine\
+memory/quarantine/
 ```
 
-The scanner is a first-pass static guard, not a replacement for Windows Defender or a full antivirus. It flags double-extension lures, dangerous script patterns, suspicious archives, unsigned executables, and common insecure code patterns.
+The scanner is a first-pass static guard, not a replacement for a real antivirus. It flags double-extension lures, dangerous script patterns, suspicious archives, unsigned executables (Authenticode on Windows, codesign on macOS), and common insecure code patterns.
 
 ## GitHub scans
 
@@ -47,12 +57,12 @@ Lotus checks GitHub Releases on launch. When a newer Windows beta zip is publish
 
 ## Here is the roadmap for future updates
 
-- iOS, Android, Mac, and Linux
+- iOS, Android, Linux, and app-store builds
 - Paid personal/enterprise tiers, quotas, and billing
 - Multi-AI fallback providers
 - VirtualBox/VM sandbox for untrusted code execution
 - Automatic GitHub pull requests or vulnerability rewrites
-- Plugins, remote dashboard, enterprise SSO/audit exports
+- Voice interface, plugins, remote dashboard, enterprise SSO/audit exports
 
 See `docs/ROADMAP.md` for the full backlog and reasons.
 

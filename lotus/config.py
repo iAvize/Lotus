@@ -26,9 +26,20 @@ QUARANTINE_DIR = MEMORY_DIR / "quarantine"
 UPDATE_DIR = MEMORY_DIR / "updates"
 
 
+def memory_dir() -> Path:
+    """Directory holding the SQLite DB and runtime data. LOTUS_DB_DIR
+    overrides it (used by tests to stay hermetic)."""
+    env = os.environ.get("LOTUS_DB_DIR")
+    return Path(env) if env else MEMORY_DIR
+
+
+def db_path() -> Path:
+    return memory_dir() / "lotus_ai.db"
+
+
 def ensure_dirs() -> None:
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    MEMORY_DIR.mkdir(parents=True, exist_ok=True)
+    memory_dir().mkdir(parents=True, exist_ok=True)
     QUARANTINE_DIR.mkdir(parents=True, exist_ok=True)
     UPDATE_DIR.mkdir(parents=True, exist_ok=True)
 

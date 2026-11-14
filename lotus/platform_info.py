@@ -13,22 +13,54 @@ import sys
 
 
 def _gpu_names() -> str:
-    if sys.platform != "win32":
-        return ""
     try:
-        kwargs = {"capture_output": True, "text": True, "timeout": 5}
-        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+        if sys.platform == "win32":
+            kwargs = {"capture_output": True, "text": True, "timeout": 5}
+            kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+            result = subprocess.run(
+                [
+                    "powershell", "-NoProfile", "-Command",
+                    "Get-CimInstance Win32_VideoController | Select-Object -ExpandProperty Name",
+                ],
+                **kwargs,
+            )
+            names = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+            return "; ".join(names)
+        if sys.platform == "darwin":
+            result = subprocess.run(
+                ["system_profiler", "SPDisplaysDataType"],
+                capture_output=True, text=True, timeout=10,
+            )
+            names = []
+            for line in (result.stdout or "").splitlines():
+                if "Chipset Model:" in line:
+                    names.append(line.split(":", 1)[1].strip())
+            return "; ".join(dict.fromkeys(names))
         result = subprocess.run(
-            [
-                "powershell", "-NoProfile", "-Command",
-                "Get-CimInstance Win32_VideoController | Select-Object -ExpandProperty Name",
-            ],
-            **kwargs,
-        )
-        names = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+            ["lspci"], capture_output=True, text=True, timeout=5)
+        names = [line.split(":", 2)[-1].strip()
+                 for line in (result.stdout or "").splitlines()
+                 if "VGA" in line or "3D controller" in line]
         return "; ".join(names)
     except Exception:
         return ""
+
+
+def _cpu_name() -> str:
+    name = platform.processor()
+    if name:
+        return name
+    if sys.platform == "darwin":
+        try:
+            result = subprocess.run(
+                ["sysctl", "-n", "machdep.cpu.brand_string"],
+                capture_output=True, text=True, timeout=5)
+            if result.stdout.strip():
+                return result.stdout.strip()
+        except Exception:
+            pass
+        return platform.machine() or "unknown"
+    return "unknown"
 
 
 def collect() -> str:
@@ -39,7 +71,7 @@ def collect() -> str:
         f"Hostname: {socket.gethostname()}",
         f"User profile: {os.path.expanduser('~')}",
         f"Python: {sys.version.split()[0]}",
-        f"Processor: {platform.processor() or 'unknown'}",
+        f"Processor: {_cpu_name()}",
         f"CPU count: {os.cpu_count() or 'unknown'}",
     ]
 

@@ -24,6 +24,7 @@ memory/
 # Update staging
 _lotus_update_staging/
 _apply_lotus_update.bat
+_apply_lotus_update.sh
 
 # Editors / OS
 .vscode/

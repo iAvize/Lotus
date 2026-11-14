@@ -7,14 +7,33 @@
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "backgroundColor": "#080512",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "cover",
+      "backgroundColor": "#080512"
+    },
     "ios": {
       "bundleIdentifier": "com.avize.lotus.beta",
       "buildNumber": "1",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": false
+        },
+        "NSCameraUsageDescription": "Lotus does not use the camera.",
+        "NSLocationWhenInUseUsageDescription": "Lotus does not use your location.",
+        "NSUserTrackingUsageDescription": "Lotus does not track you."
+      }
     },
     "android": {
       "package": "com.avize.lotus.beta",
-      "versionCode": 1
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#080512"
+      }
     },
     "plugins": [
       "expo-secure-store",

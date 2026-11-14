@@ -15,13 +15,19 @@ def test_version_files_in_sync():
 
 def test_themes_valid():
     from lotus.ui import theme
-    assert set(theme.THEME_NAMES) == {"purple", "blue", "red", "pink", "green"}
+    assert set(theme.THEME_NAMES) == {"purple", "blue", "red", "pink", "green", "orange"}
     for name in theme.THEME_NAMES:
         pal = theme.PALETTES[name]
         assert all(k in pal for k in ("accent", "window", "panel_bg", "title", "subtitle"))
         assert theme.stylesheet(name)
 
 
+import sys as _sys
+import pytest
+
+
+@pytest.mark.skipif(_sys.platform != "win32",
+                    reason="beta zip wraps the Windows PyInstaller exe")
 def test_beta_zip_has_no_source(tmp_path):
     import subprocess, sys
     subprocess.run([sys.executable, str(ROOT / "scripts" / "build_beta_zip.py")],
@@ -36,6 +42,9 @@ def test_updater_pending_gate(tmp_path):
     from lotus import updater
     assert updater.pending_update(tmp_path) is None
     (tmp_path / "_apply_lotus_update.bat").write_text("@echo off")
+    assert updater.pending_update(tmp_path) is not None
+    (tmp_path / "_apply_lotus_update.bat").unlink()
+    (tmp_path / "_apply_lotus_update.sh").write_text("#!/bin/sh")
     assert updater.pending_update(tmp_path) is not None
 
 
@@ -58,3 +67,17 @@ def test_personality_defaults_and_clamp(tmp_path, monkeypatch):
     block = personality.prompt_block()
     assert "Voice calibration" in block and "conversation only" in block
     personality.reset()
+
+
+def test_usage_metering(tmp_path, monkeypatch):
+    monkeypatch.setenv("LOTUS_DB_DIR", str(tmp_path))
+    from lotus import usage
+    iid = usage.install_id()
+    assert len(iid) == 12 and usage.install_id() == iid
+    usage.record_tokens(150, "gemini-test")
+    usage.record_vm_seconds(120)
+    s = usage.summary()
+    assert s["all_time"]["tokens"] == 150 and s["all_time"]["vm_minutes"] == 2.0
+    assert s["today"]["tokens"] == 150
+    usage.reset()
+    assert usage.summary()["all_time"]["tokens"] == 0

@@ -20,6 +20,9 @@ _DANGEROUS_EXT = {
     ".exe", ".msi", ".bat", ".cmd", ".ps1", ".vbs", ".vbe", ".js", ".jse",
     ".wsf", ".wsh", ".scr", ".com", ".pif", ".hta", ".lnk", ".dll", ".jar",
     ".reg", ".iso", ".img", ".gadget", ".msc", ".msp", ".cpl", ".inf",
+    # macOS executables/installers/scriptable payloads
+    ".app", ".dmg", ".pkg", ".command", ".scpt", ".applescript",
+    ".workflow", ".mobileconfig", ".dylib", ".kext",
 }
 _ARCHIVE_EXT = {".zip", ".jar", ".7z", ".rar", ".tar", ".gz"}
 _BAIT_EXT = {
@@ -28,7 +31,7 @@ _BAIT_EXT = {
 }
 _SCRIPT_EXT = {
     ".ps1", ".bat", ".cmd", ".vbs", ".js", ".jse", ".wsf", ".py", ".reg",
-    ".hta", ".sh",
+    ".hta", ".sh", ".zsh", ".command", ".scpt", ".applescript",
 }
 _SKIP_DIRS = {
     ".git", ".svn", ".hg", "node_modules", "__pycache__", ".venv", "venv",
@@ -65,7 +68,35 @@ _CODE_RULES = (
 )
 
 
+_MACHO_MAGIC = {
+    b"\xcf\xfa\xed\xfe", b"\xce\xfa\xed\xfe",  # 64/32-bit Mach-O (LE)
+    b"\xfe\xed\xfa\xcf", b"\xfe\xed\xfa\xce",  # 64/32-bit Mach-O (BE)
+    b"\xca\xfe\xba\xbe", b"\xbe\xba\xfe\xca",  # universal/fat binary
+}
+
+
+def _is_macho(path: Path) -> bool:
+    try:
+        with path.open("rb") as fh:
+            return fh.read(4) in _MACHO_MAGIC
+    except Exception:
+        return False
+
+
 def _is_signed(path: Path) -> str | None:
+    if sys.platform == "darwin":
+        suffix = path.suffix.lower()
+        if suffix not in {".app", ".dmg", ".pkg", ".command", ".dylib", ".kext"} \
+                and not _is_macho(path):
+            return None
+        try:
+            result = subprocess.run(
+                ["codesign", "--verify", str(path)],
+                capture_output=True, text=True, timeout=15,
+            )
+            return "signed" if result.returncode == 0 else "unsigned"
+        except Exception:
+            return None
     if sys.platform != "win32" or path.suffix.lower() not in {".exe", ".msi", ".dll", ".ps1", ".bat", ".cmd"}:
         return None
     try:

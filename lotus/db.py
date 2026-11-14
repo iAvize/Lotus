@@ -88,7 +88,7 @@ def _now() -> str:
 
 def _conn() -> sqlite3.Connection:
     config.ensure_dirs()
-    conn = sqlite3.connect(str(config.DB_PATH), timeout=10)
+    conn = sqlite3.connect(str(config.db_path()), timeout=10)
     conn.row_factory = sqlite3.Row
     conn.executescript(_SCHEMA)
     for category, key, value in _SEED_MEMORIES:

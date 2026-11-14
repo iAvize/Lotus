@@ -57,7 +57,11 @@ def check_for_update(repo: str = REPO, timeout: int = 15) -> dict | None:
     def asset_score(asset: dict) -> int:
         name = str(asset.get("name", "")).lower()
         score = 1
-        if "beta" in name or "windows" in name:
+        if "beta" in name:
+            score += 2
+        if sys.platform == "win32" and "windows" in name:
+            score += 2
+        if sys.platform == "darwin" and ("macos" in name or "mac" in name):
             score += 2
         if "source" in name:
             score -= 3
@@ -79,9 +83,9 @@ def download_update(info: dict, dest_dir: Path | None = None,
                     progress=None) -> Path:
     asset = info.get("asset") or {}
     url = asset.get("browser_download_url") or asset.get("url")
-    name = asset.get("name") or f"Lotus-{info.get('version', 'update')}-Windows.zip"
+    name = asset.get("name") or f"Lotus-{info.get('version', 'update')}.zip"
     if not url:
-        raise RuntimeError("The latest release has no downloadable Windows zip asset.")
+        raise RuntimeError("The latest release has no downloadable zip asset.")
 
     dest_dir = dest_dir or (config.UPDATE_DIR)
     dest_dir.mkdir(parents=True, exist_ok=True)
@@ -114,41 +118,60 @@ def _zip_source_dir(zip_path: Path, extract_dir: Path) -> Path:
     return extract_dir
 
 
-def _launch_bat(bat: Path) -> None:
-    creationflags = 0
-    for flag in ("DETACHED_PROCESS", "CREATE_NEW_PROCESS_GROUP",
-                 "CREATE_NO_WINDOW"):
-        if hasattr(subprocess, flag):
-            creationflags |= getattr(subprocess, flag)
-    subprocess.Popen(["cmd.exe", "/c", str(bat)], cwd=str(bat.parent),
-                     creationflags=creationflags, close_fds=True)
+def _launch_helper(script: Path) -> None:
+    """Detach the staged apply-script so it outlives the exiting app."""
+    if sys.platform == "win32":
+        creationflags = 0
+        for flag in ("DETACHED_PROCESS", "CREATE_NEW_PROCESS_GROUP",
+                     "CREATE_NO_WINDOW"):
+            if hasattr(subprocess, flag):
+                creationflags |= getattr(subprocess, flag)
+        subprocess.Popen(["cmd.exe", "/c", str(script)], cwd=str(script.parent),
+                         creationflags=creationflags, close_fds=True)
+    else:
+        subprocess.Popen(["/bin/sh", str(script)], cwd=str(script.parent),
+                         start_new_session=True, close_fds=True,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                         stdin=subprocess.DEVNULL)
+
+
+_APPLY_NAMES = ("_apply_lotus_update.bat", "_apply_lotus_update.sh")
 
 
 def pending_update(app_dir: Path | None = None) -> Path | None:
-    """The apply-batch a previous 'update on relaunch' left behind. Its mere
+    """The apply-script a previous 'update on relaunch' left behind. Its mere
     existence means an update is owed before the app may be used."""
     app_dir = app_dir or config.BASE_DIR
-    bat = app_dir / "_apply_lotus_update.bat"
-    return bat if bat.exists() else None
+    for name in _APPLY_NAMES:
+        candidate = app_dir / name
+        if candidate.exists():
+            return candidate
+    return None
 
 
 def run_pending(app_dir: Path | None = None) -> bool:
-    """Launch the staged apply-batch; caller must exit immediately after."""
-    bat = pending_update(app_dir)
-    if not bat:
+    """Launch the staged apply-script; caller must exit immediately after."""
+    script = pending_update(app_dir)
+    if not script:
         return False
-    _launch_bat(bat)
+    _launch_helper(script)
     return True
+
+
+def _relaunch_line() -> str:
+    """POSIX: how the apply-script brings Lotus back after swapping files."""
+    exe = Path(sys.executable).resolve()
+    for parent in (exe, *exe.parents):
+        if parent.suffix == ".app":
+            return f'open "{parent}"'
+    return f'cd "$DST" && nohup "{exe}" -m lotus >/dev/null 2>&1 &'
 
 
 def apply_update(zip_path: Path, app_dir: Path | None = None,
                  launch: bool = True) -> Path:
-    """Stage an update and (optionally) launch the helper batch that swaps
+    """Stage an update and (optionally) launch the helper script that swaps
     files after exit. launch=False defers the swap to the next app start —
     app.py checks pending_update() before showing any UI."""
-    if sys.platform != "win32":
-        raise RuntimeError("Self-update is currently implemented for Windows beta only.")
-
     app_dir = (app_dir or config.BASE_DIR).resolve()
     staging = app_dir / "_lotus_update_staging"
     if staging.exists():
@@ -166,22 +189,40 @@ def apply_update(zip_path: Path, app_dir: Path | None = None,
             else:
                 shutil.copy2(item, dest)
 
-    bat = app_dir / "_apply_lotus_update.bat"
     src = staging
     dst = app_dir
-    bat.write_text(
-        "@echo off\r\n"
-        "setlocal\r\n"
-        f'set "SRC={src}"\r\n'
-        f'set "DST={dst}"\r\n'
-        "timeout /t 2 /nobreak >nul\r\n"
-        'robocopy "%SRC%" "%DST%" /E /R:1 /W:1 /NFL /NDL /NJH /NJS /XD .git memory config .venv venv __pycache__ dist /XF api_keys.json lotus_ai.db >nul\r\n'
-        'if exist "%SRC%" rmdir /s /q "%SRC%"\r\n'
-        'if exist "%DST%\\Lotus Beta.exe" (start "" "%DST%\\Lotus Beta.exe") else (if exist "%DST%\\Run-Lotus.bat" start "" "%DST%\\Run-Lotus.bat")\r\n'
-        'del "%~f0"\r\n',
-        encoding="utf-8",
-    )
+    if sys.platform == "win32":
+        script = app_dir / "_apply_lotus_update.bat"
+        script.write_text(
+            "@echo off\r\n"
+            "setlocal\r\n"
+            f'set "SRC={src}"\r\n'
+            f'set "DST={dst}"\r\n'
+            "timeout /t 2 /nobreak >nul\r\n"
+            'robocopy "%SRC%" "%DST%" /E /R:1 /W:1 /NFL /NDL /NJH /NJS /XD .git memory config .venv venv __pycache__ dist /XF api_keys.json lotus_ai.db >nul\r\n'
+            'if exist "%SRC%" rmdir /s /q "%SRC%"\r\n'
+            'if exist "%DST%\\Lotus Beta.exe" (start "" "%DST%\\Lotus Beta.exe") else (if exist "%DST%\\Run-Lotus.bat" start "" "%DST%\\Run-Lotus.bat")\r\n'
+            'del "%~f0"\r\n',
+            encoding="utf-8",
+        )
+    else:
+        script = app_dir / "_apply_lotus_update.sh"
+        script.write_text(
+            "#!/bin/sh\n"
+            f'SRC="{src}"\n'
+            f'DST="{dst}"\n'
+            "sleep 2\n"
+            'rsync -a --exclude .git --exclude memory --exclude config '
+            '--exclude .venv --exclude venv --exclude __pycache__ '
+            '--exclude dist --exclude api_keys.json --exclude lotus_ai.db '
+            '"$SRC"/ "$DST"/\n'
+            'rm -rf "$SRC"\n'
+            f"{_relaunch_line()}\n"
+            'rm -f "$0"\n',
+            encoding="utf-8",
+        )
+        script.chmod(0o755)
 
     if launch:
-        _launch_bat(bat)
-    return bat
+        _launch_helper(script)
+    return script

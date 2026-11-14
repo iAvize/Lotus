@@ -52,8 +52,24 @@ _NOT_CONFIGURED = {
 
 # Files/dirs never copied official -> staging (secrets and runtime data stay out of the VM).
 _SYNC_EXCLUDE_DIRS = (".git", ".venv", "memory", "build", "dist", "__pycache__",
-                      "_lotus_update_staging")
+                      "_lotus_update_staging", "node_modules", ".expo")
 _SYNC_EXCLUDE_FILES = ("api_keys.json", "devbox.json", "*.pyc", "*.log")
+
+
+def _local_mode() -> bool:
+    """Hosts without the Lotus-Lab VM still get a lab: staging commands run
+    directly on this machine (POSIX shell) instead of inside a guest.
+    `devbox_mode=local|vbox` in settings (or LOTUS_DEVBOX_MODE env) forces it."""
+    forced = _cfg.get_setting("devbox_mode", "") or os.environ.get("LOTUS_DEVBOX_MODE", "")
+    if forced:
+        return forced == "local"
+    if sys.platform == "win32":
+        return False
+    return _vm_state() in ("missing", "unknown")
+
+
+def executor() -> str:
+    return "local" if _local_mode() else "vbox"
 
 
 def _base_dir() -> Path:
@@ -139,8 +155,10 @@ def status() -> dict:
     share_dir = base / "share"
     stage = staging_dir()
     staged = len([p for p in stage.rglob("*") if p.is_file()]) if stage.is_dir() else 0
+    mode = executor()
     return {
         "ok": True, "vm": VM_NAME, "virtualbox": bool(exe), "vm_state": state,
+        "mode": mode,
         "share_dir": str(share_dir), "guest_share": GUEST_SHARE,
         "staging": str(stage), "staged_files": staged,
         "guest_stage": GUEST_STAGE,
@@ -154,6 +172,9 @@ def ensure_share() -> dict:
     share = _base_dir() / "share"
     for sub in ("staging", "reports"):
         (share / sub).mkdir(parents=True, exist_ok=True)
+    if _local_mode():
+        return {"ok": True, "share": str(share), "mode": "local",
+                "note": "no VM registered — staging lives on the host share"}
     state = _vm_state()
     if state not in ("poweroff", "saved"):
         return {"ok": False, "error": f"VM is {state}; power it off first"}
@@ -233,13 +254,33 @@ def _ensure_runner() -> Path:
     return runner
 
 
-def run_guest(command: str, timeout_s: int = 180, cwd: str = GUEST_STAGE) -> dict:
-    """Run a shell command inside the VM and return captured output.
+def _local_run(command: str, timeout_s: int = 180, cwd: Path | None = None) -> dict:
+    """Local lab executor — run a command in the staging copy directly."""
+    workdir = cwd or staging_dir()
+    workdir.mkdir(parents=True, exist_ok=True)
+    try:
+        r = subprocess.run(command, shell=True, cwd=str(workdir),
+                           capture_output=True, text=True, timeout=timeout_s,
+                           encoding="utf-8", errors="replace")
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "error": f"command timed out after {timeout_s}s",
+                "command": command}
+    return {"ok": r.returncode == 0, "exit_code": r.returncode,
+            "output": (r.stdout or "").strip()[:6000],
+            "stderr": (r.stderr or "").strip()[:2000],
+            "command": command, "mode": "local"}
 
-    The command executes via a PowerShell runner launched with
+
+def run_guest(command: str, timeout_s: int = 180, cwd: str = GUEST_STAGE) -> dict:
+    """Run a shell command inside the lab and return captured output.
+
+    VirtualBox guests execute via a PowerShell runner launched with
     `guestcontrol start` (never `run` — its stdout reader hangs when the
-    child inherits handles). The runner writes EXIT/STDOUT/STDERR to a report
-    file in the shared folder, which the host polls."""
+    child inherits handles); the runner writes EXIT/STDOUT/STDERR to a report
+    file in the shared folder, which the host polls. In local mode the command
+    runs directly in the host staging copy."""
+    if _local_mode():
+        return _local_run(command, timeout_s=timeout_s)
     up = ensure_running()
     if not up.get("ok"):
         return up
@@ -279,7 +320,11 @@ def run_guest(command: str, timeout_s: int = 180, cwd: str = GUEST_STAGE) -> dic
 
 
 def ensure_running(timeout_s: int = 300) -> dict:
-    """Boot the lab headless if needed and wait for guest control."""
+    """Boot the lab headless if needed and wait for guest control.
+    In local mode there is nothing to boot — staging is the lab."""
+    if _local_mode():
+        staging_dir().mkdir(parents=True, exist_ok=True)
+        return {"ok": True, "mode": "local"}
     if _vm_state() != "running":
         r = _run("startvm", VM_NAME, "--type", "headless")
         if r.returncode != 0:
@@ -301,6 +346,8 @@ def _poweroff(timeout_s: int = 75) -> bool:
     """Graceful shutdown first (ACPI power button = normal Windows shutdown);
     hard poweroff only as fallback. Repeatedly yanking power is how a lab
     disk gets corrupted — the dev VM keeps one disk around for a long time."""
+    if _local_mode():
+        return True
     if _vm_state() != "running":
         return True
     _run("controlvm", VM_NAME, "acpipowerbutton", timeout=20)
@@ -319,6 +366,9 @@ def _poweroff(timeout_s: int = 75) -> bool:
 
 
 def snapshot(name: str = "dev-ready") -> dict:
+    if _local_mode():
+        return {"ok": False,
+                "error": "snapshots need a VM — the local lab has no disk image to freeze"}
     was_running = _vm_state() == "running"
     if was_running and not _poweroff():
         return {"ok": False, "error": "couldn't power off for the snapshot"}
@@ -335,6 +385,10 @@ def snapshot(name: str = "dev-ready") -> dict:
 
 def revert(name: str = "dev-ready") -> dict:
     """Restore the lab to its clean baseline and boot it again."""
+    if _local_mode():
+        res = sync()
+        return {"ok": bool(res.get("ok")), "restored": "staging",
+                "detail": res.get("summary", "")}
     if not _poweroff():
         return {"ok": False, "error": "couldn't shut down for the restore"}
     r = _run("snapshot", VM_NAME, "restore", name, timeout=300)
@@ -348,11 +402,60 @@ def revert(name: str = "dev-ready") -> dict:
 
 # ── Staging copy (host side) ────────────────────────────────────────────────
 
+def _excluded(rel: Path) -> bool:
+    import fnmatch
+    parts = rel.parts
+    if any(part in _SYNC_EXCLUDE_DIRS for part in parts):
+        return True
+    name = rel.name
+    return any(fnmatch.fnmatch(name, pat) for pat in _SYNC_EXCLUDE_FILES)
+
+
+def _mirror(src: Path, dst: Path) -> tuple[int, int]:
+    """POSIX robocopy /MIR: copy new/changed files, remove extras."""
+    copied = removed = 0
+    src = src.resolve()
+    dst = dst.resolve()
+    for p in sorted(dst.rglob("*"), key=lambda x: len(x.parts), reverse=True):
+        rel = p.relative_to(dst)
+        if _excluded(rel):
+            continue
+        sp = src / rel
+        if not sp.exists() or p.is_dir() != sp.is_dir():
+            (shutil.rmtree if p.is_dir() else Path.unlink)(p)
+            removed += 1
+    for p in sorted(src.rglob("*")):
+        rel = p.relative_to(src)
+        if _excluded(rel):
+            continue
+        dp = dst / rel
+        if p.is_dir():
+            dp.mkdir(parents=True, exist_ok=True)
+            continue
+        dp.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            stale = (not dp.exists() or p.stat().st_size != dp.stat().st_size
+                     or p.stat().st_mtime_ns > dp.stat().st_mtime_ns)
+        except OSError:
+            stale = True
+        if stale:
+            shutil.copy2(p, dp)
+            copied += 1
+    return copied, removed
+
+
 def sync() -> dict:
     """Mirror the official source into the staging share. Secrets and runtime
-    data are never copied. Returns the robocopy summary."""
+    data are never copied."""
     stage = staging_dir()
     stage.mkdir(parents=True, exist_ok=True)
+    if sys.platform != "win32":
+        try:
+            copied, removed = _mirror(ROOT, stage)
+        except Exception as e:
+            return {"ok": False, "error": f"sync failed: {e}"}
+        return {"ok": True, "exit_code": 0, "staging": str(stage),
+                "summary": f"mirrored staging: {copied} file(s) copied, {removed} removed"}
     cmd = ["robocopy", str(ROOT), str(stage), "/MIR", "/R:1", "/W:1",
            "/NFL", "/NDL", "/NJH", "/NP"]
     for d in _SYNC_EXCLUDE_DIRS:
@@ -520,10 +623,20 @@ _SHIMS_CMD = (
 
 
 def provision_guest() -> dict:
-    """(Re)build the lab's guest toolchain: embeddable Python 3.12 at
+    """(Re)build the lab's toolchain. VM guests get embeddable Python 3.12 at
     C:\\python312 (MSI installers can't run under guestcontrol), pip, PATH
-    shims, and the requirements from the current staging copy. Idempotent —
-    skips the toolchain if it's already there."""
+    shims, and the requirements from the current staging copy — idempotent.
+    Local mode installs staging requirements into the running interpreter."""
+    if _local_mode():
+        steps = []
+        s = sync()
+        steps.append({"step": "sync", "ok": s.get("ok", False),
+                      "detail": s.get("summary", "")[-200:]})
+        r = _local_run(f'"{sys.executable}" -m pip install --no-input --timeout 60 '
+                       "-r requirements.txt --quiet", timeout_s=900)
+        steps.append({"step": "deps", "ok": r.get("ok", False),
+                      "detail": (r.get("stderr") or r.get("output") or r.get("error") or "")[-400:]})
+        return {"ok": all(x["ok"] for x in steps), "steps": steps, "mode": "local"}
     up = ensure_running()
     if not up.get("ok"):
         return up
@@ -555,7 +668,10 @@ def provision_guest() -> dict:
 
 
 def guest_stage() -> dict:
-    """Refresh C:\\lotus-staging inside the guest from the share."""
+    """Refresh the guest's copy from the share. Local mode runs staging
+    in place — nothing to copy."""
+    if _local_mode():
+        return {"ok": True, "mode": "local"}
     r = run_guest(f"robocopy \"{GUEST_SHARE}\\staging\" \"{GUEST_STAGE}\" /MIR /R:1 /W:1 "
                   f"/NFL /NDL /NJH /NP /XD .venv __pycache__ & exit /b 0",
                   timeout_s=120, cwd=r"C:\\")
@@ -565,7 +681,9 @@ def guest_stage() -> dict:
 
 
 def guest_python() -> str | None:
-    """Locate a Python interpreter inside the guest."""
+    """Locate a Python interpreter inside the lab."""
+    if _local_mode():
+        return f'"{sys.executable}"'
     probe = run_guest("where python py 2>nul & "
                       "for %%d in (C:\\python312\\python.exe C:\\python313\\python.exe "
                       "C:\\python311\\python.exe) do if exist %%d echo %%d & "
@@ -651,6 +769,17 @@ def _record(kind: str, goal: str, detail: dict, ok: bool, duration_s: float = 0.
 # and executes them via automatic function calling. They never raise — errors
 # come back as text so the model can react.
 
+def host_note() -> str:
+    """Extra prompt context describing how the lab executes on this host."""
+    if not _local_mode():
+        return ""
+    return ("\n\nThis host runs the lab in LOCAL mode — no VM is registered, so "
+            "devbox_run commands execute directly on this machine's POSIX shell "
+            "with the staging copy as the working directory. Use POSIX paths and "
+            "shell commands (not cmd/PowerShell). Snapshots are unavailable; "
+            "devbox_revert re-syncs staging from the official source.")
+
+
 def devbox_status() -> str:
     """Return the current state of the Lotus-Lab sandbox VM and staging area."""
     return json.dumps(status())
@@ -700,9 +829,10 @@ def staging_changes() -> str:
 
 
 def devbox_run(command: str, goal: str = "") -> str:
-    """Run a Windows shell command inside the Lotus-Lab VM at C:\\lotus-staging.
+    """Run a shell command inside the lab at the staging copy.
     Use it for anything executable: compile checks, pip installs, running the
-    code, observing behavior. Never runs on the live machine."""
+    code, observing behavior. VM hosts run it in the Windows guest; local-mode
+    hosts run it on this machine's POSIX shell. Never touches official source."""
     return json.dumps(run_command(command, goal=goal))
 
 

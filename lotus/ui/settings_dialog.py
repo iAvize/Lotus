@@ -58,7 +58,7 @@ class SettingsDialog(QDialog):
         theme_row.addStretch(1)
         layout.addLayout(theme_row)
 
-        self.startup_check = QCheckBox("Run Lotus automatically when Windows starts")
+        self.startup_check = QCheckBox(startup.checkbox_label())
         self.startup_check.setChecked(startup.is_enabled())
         self.startup_check.toggled.connect(self._toggle_startup)
         layout.addWidget(self.startup_check)
@@ -116,10 +116,10 @@ class SettingsDialog(QDialog):
     def _toggle_startup(self, checked: bool):
         if startup.set_enabled(checked):
             self.status.setText(
-                "Lotus will start with Windows." if checked
-                else "Lotus will no longer start with Windows.")
+                "Lotus will start at login." if checked
+                else "Lotus will no longer start at login.")
         else:
-            self.status.setText("Could not update the Windows startup entry.")
+            self.status.setText("Could not update the login startup entry.")
             self.startup_check.blockSignals(True)
             self.startup_check.setChecked(startup.is_enabled())
             self.startup_check.blockSignals(False)

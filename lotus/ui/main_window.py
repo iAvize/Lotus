@@ -757,7 +757,9 @@ class MainWindow(QMainWindow):
 
     def _on_devbox_status(self, st: dict):
         state = html.escape(str(st.get("vm_state", "?")))
-        color = "#86efac" if st.get("vm_state") == "running" else "#f0abfc"
+        if st.get("mode") == "local":
+            state = "local lab (host)"
+        color = "#86efac" if st.get("vm_state") == "running" or st.get("mode") == "local" else "#f0abfc"
         lines = [
             f"<b>{html.escape(str(st.get('vm', 'Lotus-Lab')))}</b> — "
             f"<span style='color:{color}'>{state}</span><br>",
@@ -898,7 +900,7 @@ class MainWindow(QMainWindow):
         patterns = [
             r"\bmy (os|operating system|computer|pc|laptop|system|hardware)\b",
             r"\b(this|the) (pc|computer|laptop|machine|system)\b",
-            r"\b(system info|system information|hardware info|os version|windows version)\b",
+            r"\b(system info|system information|hardware info|os version|windows version|macos|mac version|os x)\b",
             r"\b(cpu|gpu|ram|disk space|storage|system memory|memory usage)\b",
         ]
         return any(re.search(pattern, lower) for pattern in patterns)
@@ -993,6 +995,30 @@ class MainWindow(QMainWindow):
             partitions = psutil.disk_partitions(all=True)
         except Exception:
             partitions = []
+        if sys.platform != "win32":
+            options.append(("Home folder", str(Path.home())))
+            seen = {options[0][1], str(Path.home())}
+            mounts = []
+            for part in partitions:
+                mount = part.mountpoint
+                if mount in seen:
+                    continue
+                if mount == "/":
+                    label = "Macintosh HD" if sys.platform == "darwin" else "System root"
+                    kind = "local"
+                elif mount.startswith(("/Volumes/", "/media/", "/run/media/", "/mnt/")):
+                    label = mount.rstrip("/").rsplit("/", 1)[-1] or mount
+                    kind = "external"
+                else:
+                    continue
+                seen.add(mount)
+                try:
+                    free_gb = psutil.disk_usage(mount).free / (1024 ** 3)
+                except Exception:
+                    free_gb = 0.0
+                mounts.append((f"{label} — {kind} ({free_gb:.0f} GB free)", mount))
+            options.extend(sorted(mounts, key=lambda item: item[0].lower()))
+            return options
         seen = set()
         drives = []
         for part in partitions:

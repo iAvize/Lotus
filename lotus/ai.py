@@ -152,7 +152,8 @@ def _generate(prompt: str, *, use_search: bool = False, use_devbox: bool = False
         system += f"\n\nKnown memories/preferences:\n{memories}"
     system += f"\n\n{personality.prompt_block()}"
     if use_devbox:
-        system += _DEVBOX_PROMPT
+        from . import devbox as _dbx
+        system += _DEVBOX_PROMPT + _dbx.host_note()
 
     cfg = {
         "system_instruction": system,
