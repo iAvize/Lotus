@@ -36,6 +36,14 @@
         "backgroundColor": "#080512"
       }
     },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://iavize.github.io/Lotus/",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    },
     "plugins": [
       "expo-secure-store",
       "expo-status-bar"
