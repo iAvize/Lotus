@@ -8,7 +8,6 @@ plus the Windows `Lotus Beta.exe` so trusted developers get the same app.
 from __future__ import annotations
 
 import os
-import zipfile
 from pathlib import Path
 
 import pyzipper
@@ -41,7 +40,7 @@ def main() -> None:
 
         zf.write(EXE, "Lotus Source/Lotus Beta.exe")
         zf.writestr("Lotus Source/Lotus Source.bat", LAUNCHER_BAT)
-        info = zipfile.ZipInfo("Lotus Source/Lotus Source.command")
+        info = zf.zipinfo_cls("Lotus Source/Lotus Source.command")
         info.external_attr = 0o755 << 16
         info.compress_type = pyzipper.ZIP_DEFLATED
         zf.writestr(info, LAUNCHER_COMMAND)
