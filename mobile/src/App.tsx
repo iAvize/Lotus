@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
+  BackHandler,
   FlatList,
   KeyboardAvoidingView,
   Linking,
@@ -51,7 +52,7 @@ import {
 } from "./store";
 import { PALETTES, Palette, THEME_NAMES, ThemeName } from "./theme";
 
-const VERSION = "0.1.0-beta.6";
+const VERSION = "0.1.0-beta.7";
 const AI_STUDIO_URL = "https://aistudio.google.com/apikey";
 const SUPPORT_EMAIL = "bizwithavize@outlook.com";
 const REPORT_ENDPOINT = `https://formsubmit.co/ajax/${SUPPORT_EMAIL}`;
@@ -135,7 +136,7 @@ export default function App() {
 
   const diagnostics = useCallback(() => [
     `Lotus ${VERSION}`,
-    `Platform: iOS ${Platform.Version ?? "unknown"}`,
+    `Platform: ${Platform.OS} ${Platform.Version ?? "unknown"}`,
     `Install: ${iid || "…"}`,
     `Section: ${section}`,
     lastError ? `Last error: ${lastError}` : "",
@@ -281,11 +282,28 @@ export default function App() {
     }
   }, []);
 
-  const openIOSSettings = useCallback((path: string) => {
+  const openSystemSettings = useCallback((path: string) => {
+    if (Platform.OS === "android") {
+      Linking.openSettings().catch(() => Alert.alert("Open Settings", "Open Settings → Apps → Lotus Beta manually."));
+      return;
+    }
     Linking.openURL(`App-Prefs:${path}`).catch(() => {
       Linking.openURL("App-Prefs:").catch(() => Alert.alert("Open Settings", "Go to Settings → General → iPhone Storage manually."));
     });
   }, []);
+
+  // Android hardware back returns to Ask first; from Ask it exits normally.
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (section !== "ask") {
+        setSection("ask");
+        return true;
+      }
+      return false;
+    });
+    return () => sub.remove();
+  }, [section]);
 
   const runGithubScan = useCallback(async () => {
     if (!githubInput.trim() || githubBusy) return;
@@ -404,7 +422,7 @@ export default function App() {
       {(scanReport?.findings || []).slice(0, 80).map(renderFinding)}
 
       <Text style={styles.section}>Storage audit</Text>
-      <Text style={styles.sub}>Audit storage Lotus can see. iOS does not let apps list other apps or uninstall them.</Text>
+      <Text style={styles.sub}>Audit storage Lotus can see. Mobile OSes do not let apps list other apps or uninstall them.</Text>
       <View style={styles.chips}>
         <Pressable style={[styles.btn, styles.btnGhost, storageBusy && { opacity: 0.5 }]} onPress={() => runStorageAudit("app")} disabled={storageBusy}>
           <Text style={styles.btnGhostText}>Audit Lotus storage</Text>
@@ -412,16 +430,16 @@ export default function App() {
         <Pressable style={[styles.btn, styles.btnGhost, storageBusy && { opacity: 0.5 }]} onPress={() => runStorageAudit("pick")} disabled={storageBusy}>
           <Text style={styles.btnGhostText}>Audit picked files</Text>
         </Pressable>
-        <Pressable style={[styles.btn, styles.btnGhost]} onPress={() => openIOSSettings("General&path=STORAGE")}>
-          <Text style={styles.btnGhostText}>iPhone Storage</Text>
+        <Pressable style={[styles.btn, styles.btnGhost]} onPress={() => openSystemSettings("General&path=STORAGE")}>
+          <Text style={styles.btnGhostText}>{Platform.OS === "android" ? "App settings" : "iPhone Storage"}</Text>
         </Pressable>
-        <Pressable style={[styles.btn, styles.btnGhost]} onPress={() => openIOSSettings("STORE")}>
-          <Text style={styles.btnGhostText}>App Store</Text>
+        <Pressable style={[styles.btn, styles.btnGhost]} onPress={() => Platform.OS === "android" ? openLink("https://play.google.com") : openSystemSettings("STORE")}>
+          <Text style={styles.btnGhostText}>{Platform.OS === "android" ? "Play Store" : "App Store"}</Text>
         </Pressable>
       </View>
       {!!storageProgress && <Text style={styles.progress}>{storageProgress}</Text>}
       {storageSummary(storageReport)}
-      <Text style={styles.foot}>External storage appears only if iOS exposes it through the Files picker.</Text>
+      <Text style={styles.foot}>External storage appears only if the OS exposes it through the file picker.</Text>
     </ScrollView>
   );
 
@@ -559,7 +577,7 @@ export default function App() {
   );
 
   return (
-    <SafeAreaView style={styles.root}>
+    <SafeAreaView style={[styles.root, Platform.OS === "android" && { paddingTop: StatusBar.currentHeight ?? 0 }]}>
       <StatusBar barStyle="light-content" />
       {updateReady && (
         <Pressable style={styles.updateBanner} onPress={() => Updates.reloadAsync()}>

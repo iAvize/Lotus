@@ -2,7 +2,7 @@
   "expo": {
     "name": "Lotus Beta",
     "slug": "lotus-beta",
-    "version": "0.1.0-beta.5",
+    "version": "0.1.0-beta.7",
     "scheme": "lotusbeta",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
@@ -30,11 +30,22 @@
     },
     "android": {
       "package": "com.avize.lotus.beta",
-      "versionCode": 1,
+      "versionCode": 2,
+      "edgeToEdgeEnabled": true,
+      "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#080512"
       }
+    },
+    "androidStatusBar": {
+      "barStyle": "light-content",
+      "backgroundColor": "#080512",
+      "translucent": true
+    },
+    "androidNavigationBar": {
+      "barStyle": "light-content",
+      "backgroundColor": "#080512"
     },
     "runtimeVersion": {
       "policy": "appVersion"

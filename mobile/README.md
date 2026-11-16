@@ -65,3 +65,29 @@ gotchas hit during bring-up:
   standard permission strings (we request none — camera/location/
   tracking are declared unused). If a permission is ever added, update
   its description there or Apple auto-rejects.
+
+## Path to Android (much easier than iOS)
+
+Android needs **no paid developer account** for device testing — an APK
+sideloads instantly. Build on either OS (EAS is cloud):
+
+1. `eas login` + `eas init` (same Expo account used for iOS).
+2. Preview/device build:
+   `eas build --platform android --profile preview`
+   → produces an **APK** on expo.dev; open the link on the phone (or
+   `adb install lotus-beta.apk`) — done. Enable "install unknown apps"
+   once for the browser/files app.
+3. Emulator option: `npx expo run:android` with Android Studio's
+   emulator installed — works on Windows and macOS.
+4. Play Store (later): `$25` one-time developer account,
+   `eas build -p android --profile production` → `.aab`,
+   `eas submit -p android`.
+
+Android notes:
+
+- `app.json → android` block: package `com.avize.lotus.beta`,
+  `versionCode` auto-increments via eas.json profiles (bump manually
+  for local builds), adaptive icon + themed status/nav bars set.
+- Hardware back returns to **Ask** first; from Ask it exits.
+- `expo run:android` needs a local JDK + Android SDK (Android Studio
+  install covers both) — EAS is the zero-setup path.

@@ -6,6 +6,15 @@ export type PatchNote = {
 
 export const PATCH_NOTES: PatchNote[] = [
   {
+    version: "0.1.0-beta.7",
+    date: "2026-11-15",
+    notes: [
+      "Android port: status/nav bar theming, hardware back returns to Ask, edge-to-edge layout",
+      "Platform-aware settings links (App settings / Play Store on Android)",
+      "Diagnostics now report the real platform instead of assuming iOS",
+    ],
+  },
+  {
     version: "0.1.0-beta.6",
     date: "2026-11-15",
     notes: [
