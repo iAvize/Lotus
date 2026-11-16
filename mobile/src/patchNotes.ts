@@ -6,6 +6,16 @@ export type PatchNote = {
 
 export const PATCH_NOTES: PatchNote[] = [
   {
+    version: "0.1.0-beta.5",
+    date: "2026-11-15",
+    notes: [
+      "Faster Ask Lotus chat: shorter history window, lower token cap, quicker Gemini settings",
+      "Feedback/report now include version, install ID, platform, and last error",
+      "Copy diagnostics button for pasting into email or GitHub reports",
+      "Feedback email template tells users how to attach screenshots/videos in Mail",
+    ],
+  },
+  {
     version: "0.1.0-beta.4",
     date: "2026-11-15",
     notes: [

@@ -109,8 +109,14 @@ class SettingsDialog(QDialog):
                                     "Feedback email isn't configured yet.")
             return
         from .. import __version__, usage
+        import platform
         subj = quote(f"Lotus Beta feedback (v{__version__})")
-        body = quote(f"Version: {__version__}\nInstall: {usage.install_id()}\n\n")
+        body = quote(
+            f"Version: {__version__}\nInstall: {usage.install_id()}\n"
+            f"Platform: {platform.system()} {platform.release()}\n\n"
+            "What happened?\n\n"
+            "Screenshot/video: attach before sending (Lotus can't attach files to email).\n\n"
+        )
         QDesktopServices.openUrl(QUrl(f"mailto:{email}?subject={subj}&body={body}"))
 
     def _toggle_startup(self, checked: bool):

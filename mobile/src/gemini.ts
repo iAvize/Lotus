@@ -13,7 +13,8 @@ const MODELS = [
 
 const SYSTEM = `You are Lotus, a cybersecurity AI assistant (mobile beta).
 Focus: SOC analysis, AppSec, DevSecOps, defense, safe automation.
-Be concise and professional. You run as a beta on the user's phone — never
+Answer quickly and concisely; keep replies short unless detail is requested.
+Be professional. You run as a beta on the user's phone — never
 claim actions you did not actually take.`;
 
 export class GeminiError extends Error {}
@@ -25,7 +26,7 @@ export async function generateReply(
 ): Promise<string> {
   if (!apiKey) throw new GeminiError("No Gemini key set — open Settings to add one.");
 
-  const contents = history.slice(-12).map((m) => ({
+  const contents = history.slice(-6).map((m) => ({
     role: m.role === "user" ? "user" : "model",
     parts: [{ text: m.content }],
   }));
@@ -42,7 +43,7 @@ export async function generateReply(
         body: JSON.stringify({
           contents,
           systemInstruction: { parts: [{ text: voice ? `${SYSTEM}\n\n${voice}` : SYSTEM }] },
-          generationConfig: { temperature: 0.7, maxOutputTokens: 2048 },
+          generationConfig: { temperature: 0.6, maxOutputTokens: 1024 },
         }),
       });
       const data = await res.json();

@@ -15,6 +15,7 @@ import {
   View,
 } from "react-native";
 import { generateReply } from "./gemini";
+import * as Clipboard from "expo-clipboard";
 import { ARCHETYPES, voicePrompt } from "./personality";
 import { PATCH_NOTES } from "./patchNotes";
 import {
@@ -49,10 +50,9 @@ import {
 } from "./store";
 import { PALETTES, Palette, THEME_NAMES, ThemeName } from "./theme";
 
-const VERSION = "0.1.0-beta.4";
+const VERSION = "0.1.0-beta.5";
 const AI_STUDIO_URL = "https://aistudio.google.com/apikey";
-const FEEDBACK_URL = "mailto:akaavize@outlook.com?subject=Lotus%20Beta%20Feedback";
-const REPORT_URL = "https://github.com/iAvize/Lotus/issues/new?title=Lotus%20Beta%20Report";
+const SUPPORT_EMAIL = "akaavize@outlook.com";
 
 type Section = "ask" | "files" | "privacy" | "personality" | "patches" | "settings";
 type GithubReport = ScanReport & { repo?: string; branch?: string; truncated?: boolean };
@@ -90,6 +90,7 @@ export default function App() {
   const [privacyEmail, setPrivacyEmail] = useState("");
   const [breach, setBreach] = useState<BreachResult>(null);
   const [privacyBusy, setPrivacyBusy] = useState(false);
+  const [lastError, setLastError] = useState("");
   const listRef = useRef<FlatList>(null);
 
   const C = PALETTES[themeName] || PALETTES.purple;
@@ -114,6 +115,33 @@ export default function App() {
     Linking.openURL(url).catch(() => {});
   }, []);
 
+  const diagnostics = useCallback(() => [
+    `Lotus ${VERSION}`,
+    `Platform: iOS ${Platform.Version ?? "unknown"}`,
+    `Install: ${iid || "…"}`,
+    `Section: ${section}`,
+    lastError ? `Last error: ${lastError}` : "",
+  ].filter(Boolean).join("\n"), [iid, lastError, section]);
+
+  const feedbackMailto = useCallback(() => {
+    const body = `${diagnostics()}\n\nWhat happened?\n\nScreenshot/video: attach before sending — tap the paperclip in Mail. Lotus cannot attach files directly.\n\n`;
+    return `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(`Lotus Beta feedback (v${VERSION})`)}&body=${encodeURIComponent(body)}`;
+  }, [diagnostics]);
+
+  const reportUrl = useCallback(() => {
+    const body = `${diagnostics()}\n\nError/report:\n${lastError || "(paste copied diagnostics here)"}\n\n`;
+    return `https://github.com/iAvize/Lotus/issues/new?title=${encodeURIComponent(`Lotus Beta report (v${VERSION})`)}&body=${encodeURIComponent(body)}`;
+  }, [diagnostics, lastError]);
+
+  const copyDiagnostics = useCallback(async () => {
+    try {
+      await Clipboard.setStringAsync(diagnostics());
+      Alert.alert("Copied", "Diagnostics copied — paste into feedback or report.");
+    } catch {
+      Alert.alert("Copy failed", "Could not copy diagnostics.");
+    }
+  }, [diagnostics]);
+
   const send = useCallback(async () => {
     const text = draft.trim();
     if (!text || thinking) return;
@@ -131,6 +159,7 @@ export default function App() {
       setMsgs(updated);
       saveHistory(updated);
     } catch (e: any) {
+      setLastError(`chat: ${e?.message || e}`);
       const updated: Msg[] = [...next, { role: "assistant", content: `I hit an error: ${e?.message || e}` }];
       setMsgs(updated);
       saveHistory(updated);
@@ -179,6 +208,7 @@ export default function App() {
       setScanReport(report);
       if (!report) setScanProgress("No files selected.");
     } catch (e: any) {
+      setLastError(`files scan: ${e?.message || e}`);
       setScanReport({ scanned: 0, skipped: 0, findings: [], quarantined: 0, errors: [e?.message || String(e)] });
     } finally {
       setScanBusy(false);
@@ -195,6 +225,7 @@ export default function App() {
       setStorageReport(report);
       if (!report) setStorageProgress("No files selected.");
     } catch (e: any) {
+      setLastError(`storage audit: ${e?.message || e}`);
       setStorageReport({ deviceTotal: undefined, deviceFree: undefined, roots: [], picked: [], largest: [], errors: [e?.message || String(e)], note: "Storage audit failed." });
     } finally {
       setStorageBusy(false);
@@ -216,6 +247,7 @@ export default function App() {
     try {
       setGithubReport(await scanGitHubRepo(githubInput, setScanProgress));
     } catch (e: any) {
+      setLastError(`github scan: ${e?.message || e}`);
       setGithubReport({ scanned: 0, skipped: 0, findings: [], quarantined: 0, errors: [e?.message || String(e)] });
     } finally {
       setGithubBusy(false);
@@ -432,10 +464,13 @@ export default function App() {
       </View>
 
       <Text style={styles.section}>Support</Text>
+      {!!lastError && <Text style={styles.reportText}>last error: {lastError}</Text>}
       <View style={styles.chips}>
-        <Pressable style={[styles.btn, styles.btnGhost]} onPress={() => openLink(FEEDBACK_URL)}><Text style={styles.btnGhostText}>Feedback</Text></Pressable>
-        <Pressable style={[styles.btn, styles.btnGhost]} onPress={() => openLink(REPORT_URL)}><Text style={styles.btnGhostText}>Report</Text></Pressable>
+        <Pressable style={[styles.btn, styles.btnGhost]} onPress={() => openLink(feedbackMailto())}><Text style={styles.btnGhostText}>Feedback</Text></Pressable>
+        <Pressable style={[styles.btn, styles.btnGhost]} onPress={() => openLink(reportUrl())}><Text style={styles.btnGhostText}>Report</Text></Pressable>
+        <Pressable style={[styles.btn, styles.btnGhost]} onPress={copyDiagnostics}><Text style={styles.btnGhostText}>Copy diagnostics</Text></Pressable>
       </View>
+      <Text style={styles.sub}>Feedback opens Mail with version/install ID. Attach screenshots/videos in Mail before sending.</Text>
 
       <Text style={styles.section}>GitHub scanner</Text>
       <Text style={styles.sub}>Read-only public repo scan for secrets and risky code patterns.</Text>

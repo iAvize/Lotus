@@ -62,14 +62,17 @@ def tail_bytes(limit: int = 200_000) -> bytes:
 
 
 def build_report() -> str:
-    """Compact text report for bug reports: version, system, log tail."""
+    """Compact text report for bug reports: version, install, system, log tail."""
     try:
-        from . import __version__
+        from . import __version__, usage
+        install = usage.install_id()
     except Exception:
         __version__ = "unknown"
+        install = "unknown"
     tail = tail_bytes(20_000).decode("utf-8", errors="replace") or "(no errors logged)"
     return (
         f"Lotus {__version__}\n"
+        f"Install: {install}\n"
         f"Python {platform.python_version()} | {platform.system()} {platform.release()}\n"
         f"---- lotus-error.log (tail) ----\n{tail}"
     )
