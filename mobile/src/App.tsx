@@ -3,9 +3,11 @@ import {
   Alert,
   FlatList,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   SafeAreaView,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
@@ -26,12 +28,23 @@ const C = {
   input: "#130b24",
 };
 
+const VERSION = "0.1.0-beta.2";
+const AI_STUDIO_URL = "https://aistudio.google.com/apikey";
+
+type Section = "ask" | "logs" | "settings";
+
+const SECTIONS: { id: Section; icon: string; label: string }[] = [
+  { id: "ask", icon: "✦", label: "Ask" },
+  { id: "logs", icon: "≡", label: "Logs" },
+  { id: "settings", icon: "⚙", label: "Setup" },
+];
+
 export default function App() {
+  const [section, setSection] = useState<Section>("ask");
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [draft, setDraft] = useState("");
   const [thinking, setThinking] = useState(false);
   const [key, setKeyState] = useState("");
-  const [showSettings, setShowSettings] = useState(false);
   const [keyDraft, setKeyDraft] = useState("");
   const [iid, setIid] = useState("");
   const listRef = useRef<FlatList>(null);
@@ -43,7 +56,7 @@ export default function App() {
       const k = await getKey();
       setKeyState(k);
       setKeyDraft(k);
-      if (!k) setShowSettings(true);
+      setSection(k ? "ask" : "settings");
     })();
   }, []);
 
@@ -51,7 +64,7 @@ export default function App() {
     const text = draft.trim();
     if (!text || thinking) return;
     if (!key) {
-      setShowSettings(true);
+      setSection("settings");
       return;
     }
     const next: Msg[] = [...msgs, { role: "user", content: text }];
@@ -77,8 +90,9 @@ export default function App() {
 
   const saveKey = useCallback(async () => {
     await setKey(keyDraft);
-    setKeyState(keyDraft.trim());
-    setShowSettings(false);
+    const saved = keyDraft.trim();
+    setKeyState(saved);
+    if (saved) setSection("ask");
   }, [keyDraft]);
 
   const clearHistory = useCallback(() => {
@@ -95,6 +109,10 @@ export default function App() {
     ]);
   }, []);
 
+  const openAIStudio = useCallback(() => {
+    Linking.openURL(AI_STUDIO_URL).catch(() => {});
+  }, []);
+
   const renderMsg = ({ item }: { item: Msg }) => (
     <View style={[styles.msg, item.role === "user" ? styles.user : styles.lotus]}>
       <Text style={styles.msgWho}>{item.role === "user" ? "You" : "Lotus"}</Text>
@@ -102,68 +120,16 @@ export default function App() {
     </View>
   );
 
-  const version = "0.1.0-beta.1";
-
-  if (showSettings) {
-    return (
-      <SafeAreaView style={styles.root}>
-        <StatusBar barStyle="light-content" />
-        <View style={styles.header}>
-          <Text style={styles.title}>◆ LOTUS</Text>
-        </View>
-        <View style={styles.settings}>
-          <Text style={styles.section}>Settings</Text>
-          <Text style={styles.sub}>
-            Gemini API key — stored only in this device's secure keychain.
-          </Text>
-          <TextInput
-            style={styles.input}
-            placeholder="AIza…"
-            placeholderTextColor="#5b4a86"
-            value={keyDraft}
-            onChangeText={setKeyDraft}
-            autoCapitalize="none"
-            autoCorrect={false}
-            secureTextEntry
-          />
-          <Pressable style={styles.btn} onPress={saveKey}>
-            <Text style={styles.btnText}>Save key</Text>
-          </Pressable>
-          <Pressable style={[styles.btn, styles.btnGhost]} onPress={clearHistory}>
-            <Text style={styles.btnGhostText}>Clear chat history</Text>
-          </Pressable>
-          {!!key && (
-            <Pressable
-              style={[styles.btn, styles.btnGhost]}
-              onPress={() => setShowSettings(false)}
-            >
-              <Text style={styles.btnGhostText}>Back to chat</Text>
-            </Pressable>
-          )}
-          <View style={{ flex: 1 }} />
-          <Text style={styles.foot}>v{version} · install {iid}</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  return (
-    <SafeAreaView style={styles.root}>
-      <StatusBar barStyle="light-content" />
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>◆ LOTUS</Text>
-          <Text style={styles.sub}>cybersecurity ai · mobile beta</Text>
-        </View>
-        <Pressable onPress={() => setShowSettings(true)} style={styles.gear}>
-          <Text style={styles.gearText}>⚙</Text>
-        </Pressable>
-      </View>
-
+  const askPanel = (
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+      style={styles.panel}
+    >
       <FlatList
         ref={listRef}
         style={styles.list}
-        contentContainerStyle={{ padding: 14, paddingBottom: 8 }}
+        contentContainerStyle={{ padding: 12, paddingBottom: 8 }}
         data={msgs}
         keyExtractor={(_, i) => String(i)}
         renderItem={renderMsg}
@@ -177,32 +143,123 @@ export default function App() {
           thinking ? <Text style={styles.thinking}>Lotus is typing…</Text> : undefined
         }
       />
+      <View style={styles.composer}>
+        <TextInput
+          style={styles.composerInput}
+          placeholder="Ask Lotus…"
+          placeholderTextColor="#5b4a86"
+          value={draft}
+          onChangeText={setDraft}
+          multiline
+          editable={!thinking}
+          onSubmitEditing={send}
+        />
+        <Pressable
+          style={[styles.sendBtn, (thinking || !draft.trim()) && { opacity: 0.5 }]}
+          onPress={send}
+          disabled={thinking || !draft.trim()}
+        >
+          <Text style={styles.sendText}>➤</Text>
+        </Pressable>
+      </View>
+      <Text style={styles.footSmall}>v{VERSION}</Text>
+    </KeyboardAvoidingView>
+  );
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
-      >
-        <View style={styles.composer}>
-          <TextInput
-            style={styles.composerInput}
-            placeholder="Ask Lotus…"
-            placeholderTextColor="#5b4a86"
-            value={draft}
-            onChangeText={setDraft}
-            multiline
-            editable={!thinking}
-            onSubmitEditing={send}
-          />
-          <Pressable
-            style={[styles.sendBtn, (thinking || !draft.trim()) && { opacity: 0.5 }]}
-            onPress={send}
-            disabled={thinking || !draft.trim()}
-          >
-            <Text style={styles.sendText}>➤</Text>
-          </Pressable>
+  const logsPanel = (
+    <View style={styles.panel}>
+      <FlatList
+        style={styles.list}
+        contentContainerStyle={{ padding: 12, paddingBottom: 18 }}
+        data={msgs}
+        keyExtractor={(_, i) => String(i)}
+        renderItem={renderMsg}
+        ListHeaderComponent={
+          <View style={styles.logsHead}>
+            <Text style={styles.section}>Logs / Memory</Text>
+            <Text style={styles.sub}>
+              On-device chat history · {msgs.length} message{msgs.length === 1 ? "" : "s"}
+            </Text>
+            <Pressable style={[styles.btn, styles.btnGhost, styles.logsClear]} onPress={clearHistory}>
+              <Text style={styles.btnGhostText}>Clear history</Text>
+            </Pressable>
+          </View>
+        }
+        ListEmptyComponent={<Text style={styles.empty}>No messages yet.</Text>}
+        ListFooterComponent={<Text style={styles.foot}>v{VERSION} · install {iid}</Text>}
+      />
+    </View>
+  );
+
+  const settingsPanel = (
+    <ScrollView style={styles.panel} contentContainerStyle={styles.settingsScroll}>
+      <Text style={styles.section}>Settings</Text>
+      <Text style={styles.sub}>
+        Gemini API key — stored only in this device's secure keychain.
+      </Text>
+      <TextInput
+        style={styles.input}
+        placeholder="AIza…"
+        placeholderTextColor="#5b4a86"
+        value={keyDraft}
+        onChangeText={setKeyDraft}
+        autoCapitalize="none"
+        autoCorrect={false}
+        secureTextEntry
+      />
+      <Pressable style={styles.btn} onPress={saveKey}>
+        <Text style={styles.btnText}>Save key</Text>
+      </Pressable>
+      <Pressable style={[styles.btn, styles.btnGhost]} onPress={openAIStudio}>
+        <Text style={styles.btnGhostText}>Get a Gemini API key in AI Studio</Text>
+      </Pressable>
+      <Pressable style={[styles.btn, styles.btnGhost]} onPress={clearHistory}>
+        <Text style={styles.btnGhostText}>Clear chat history</Text>
+      </Pressable>
+      {!!key && (
+        <Pressable style={[styles.btn, styles.btnGhost]} onPress={() => setSection("ask")}>
+          <Text style={styles.btnGhostText}>Back to chat</Text>
+        </Pressable>
+      )}
+      <Text style={styles.foot}>v{VERSION} · install {iid}</Text>
+    </ScrollView>
+  );
+
+  return (
+    <SafeAreaView style={styles.root}>
+      <StatusBar barStyle="light-content" />
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.title}>◆ LOTUS</Text>
+          <Text style={styles.sub}>cybersecurity ai · mobile beta</Text>
         </View>
-        <Text style={styles.footSmall}>v{version}</Text>
-      </KeyboardAvoidingView>
+        <Text style={styles.headInstall}>#{iid || "…"}</Text>
+      </View>
+
+      <View style={styles.body}>
+        <View style={styles.rail}>
+          {SECTIONS.map((s) => (
+            <Pressable
+              key={s.id}
+              onPress={() => setSection(s.id)}
+              style={[styles.orb, section === s.id && styles.orbActive]}
+            >
+              <Text style={[styles.orbIcon, section === s.id && styles.orbIconActive]}>
+                {s.icon}
+              </Text>
+              <Text style={[styles.orbLabel, section === s.id && styles.orbLabelActive]}>
+                {s.label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
+        <View style={styles.content}>
+          {section === "ask" && askPanel}
+          {section === "logs" && logsPanel}
+          {section === "settings" && settingsPanel}
+        </View>
+      </View>
     </SafeAreaView>
   );
 }
@@ -213,21 +270,49 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: C.border,
     backgroundColor: "rgba(20, 12, 38, 0.9)",
   },
-  title: { color: C.text, fontWeight: "800", fontSize: 18, letterSpacing: 3 },
+  title: { color: C.text, fontWeight: "800", fontSize: 17, letterSpacing: 3 },
   sub: { color: C.sub, fontSize: 11 },
-  section: { color: C.accentLight, fontSize: 15, fontWeight: "700", marginBottom: 8 },
-  gear: { padding: 6 },
-  gearText: { color: C.accentLight, fontSize: 20 },
+  headInstall: { color: C.sub, fontSize: 10 },
+  body: { flex: 1, flexDirection: "row" },
+  rail: {
+    width: 66,
+    alignItems: "center",
+    paddingVertical: 12,
+    borderRightWidth: 1,
+    borderRightColor: C.border,
+    backgroundColor: "rgba(16, 9, 30, 0.9)",
+  },
+  orb: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: "center",
+    justifyContent: "center",
+    marginVertical: 7,
+    backgroundColor: C.panel,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  orbActive: {
+    borderColor: C.accent,
+    backgroundColor: "rgba(139, 92, 246, 0.24)",
+  },
+  orbIcon: { color: C.sub, fontSize: 18, fontWeight: "800" },
+  orbIconActive: { color: C.accentLight },
+  orbLabel: { color: C.sub, fontSize: 8, marginTop: 2, fontWeight: "700" },
+  orbLabelActive: { color: C.accentLight },
+  content: { flex: 1 },
+  panel: { flex: 1 },
   list: { flex: 1 },
   empty: { color: C.sub, textAlign: "center", marginTop: 60, fontSize: 13 },
   thinking: { color: C.sub, fontStyle: "italic", marginTop: 8 },
-  msg: { marginVertical: 5, padding: 10, borderRadius: 10, maxWidth: "88%" },
+  msg: { marginVertical: 5, padding: 10, borderRadius: 10, maxWidth: "90%" },
   user: {
     alignSelf: "flex-end",
     backgroundColor: "#241243",
@@ -271,31 +356,36 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
   },
   sendText: { color: "#fff", fontSize: 15, fontWeight: "700" },
-  settings: { padding: 20 },
+  footSmall: { color: C.sub, fontSize: 10, textAlign: "center", paddingBottom: 6 },
+  section: { color: C.accentLight, fontSize: 15, fontWeight: "700", marginBottom: 6 },
+  logsHead: { marginBottom: 12 },
+  logsClear: { alignSelf: "flex-start", marginTop: 8 },
+  settingsScroll: { padding: 18, paddingBottom: 28 },
   input: {
     color: C.text,
     backgroundColor: C.input,
     borderWidth: 1,
     borderColor: C.border,
     borderRadius: 10,
-    padding: 12,
-    marginTop: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
     fontSize: 14,
+    marginBottom: 10,
   },
   btn: {
     backgroundColor: C.accent,
     borderRadius: 10,
-    padding: 13,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
     alignItems: "center",
-    marginTop: 14,
+    marginBottom: 10,
   },
-  btnText: { color: "#fff", fontWeight: "700" },
+  btnText: { color: "#fff", fontWeight: "800", fontSize: 13 },
   btnGhost: {
     backgroundColor: "transparent",
     borderWidth: 1,
     borderColor: C.border,
   },
-  btnGhostText: { color: C.sub, fontWeight: "600" },
-  foot: { color: "#5b4a86", fontSize: 11, textAlign: "center", paddingVertical: 14 },
-  footSmall: { color: "#5b4a86", fontSize: 10, textAlign: "right", paddingRight: 12, paddingBottom: 6 },
+  btnGhostText: { color: C.text, fontWeight: "700", fontSize: 12 },
+  foot: { color: C.sub, fontSize: 10, marginTop: 18 },
 });
