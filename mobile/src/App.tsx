@@ -21,9 +21,13 @@ import {
   BROKERS,
   Finding,
   ScanReport,
+  StorageReport,
+  auditAppStorage,
   breachCheck,
+  formatBytes,
   nextPrivacyStatus,
   pickAndScan,
+  pickStorageAudit,
   scanAppStorage,
   scanGitHubRepo,
 } from "./security";
@@ -45,7 +49,7 @@ import {
 } from "./store";
 import { PALETTES, Palette, THEME_NAMES, ThemeName } from "./theme";
 
-const VERSION = "0.1.0-beta.3";
+const VERSION = "0.1.0-beta.4";
 const AI_STUDIO_URL = "https://aistudio.google.com/apikey";
 const FEEDBACK_URL = "mailto:akaavize@outlook.com?subject=Lotus%20Beta%20Feedback";
 const REPORT_URL = "https://github.com/iAvize/Lotus/issues/new?title=Lotus%20Beta%20Report";
@@ -75,6 +79,9 @@ export default function App() {
   const [person, setPerson] = useState<Personality>({ archetype: "neutral", notes: "" });
   const [privacyState, setPrivacyStateLocal] = useState<PrivacyState>({});
   const [scanReport, setScanReport] = useState<ScanReport | GithubReport | null>(null);
+  const [storageReport, setStorageReport] = useState<StorageReport | null>(null);
+  const [storageBusy, setStorageBusy] = useState(false);
+  const [storageProgress, setStorageProgress] = useState("");
   const [scanBusy, setScanBusy] = useState(false);
   const [scanProgress, setScanProgress] = useState("");
   const [githubInput, setGithubInput] = useState("");
@@ -179,6 +186,28 @@ export default function App() {
     }
   }, []);
 
+  const runStorageAudit = useCallback(async (kind: "app" | "pick") => {
+    setStorageBusy(true);
+    setStorageProgress(kind === "app" ? "Measuring Lotus storage…" : "Opening Files picker…");
+    setStorageReport(null);
+    try {
+      const report = kind === "app" ? await auditAppStorage(setStorageProgress) : await pickStorageAudit(setStorageProgress);
+      setStorageReport(report);
+      if (!report) setStorageProgress("No files selected.");
+    } catch (e: any) {
+      setStorageReport({ deviceTotal: undefined, deviceFree: undefined, roots: [], picked: [], largest: [], errors: [e?.message || String(e)], note: "Storage audit failed." });
+    } finally {
+      setStorageBusy(false);
+      setStorageProgress("");
+    }
+  }, []);
+
+  const openIOSSettings = useCallback((path: string) => {
+    Linking.openURL(`App-Prefs:${path}`).catch(() => {
+      Linking.openURL("App-Prefs:").catch(() => Alert.alert("Open Settings", "Go to Settings → General → iPhone Storage manually."));
+    });
+  }, []);
+
   const runGithubScan = useCallback(async () => {
     if (!githubInput.trim() || githubBusy) return;
     setGithubBusy(true);
@@ -239,6 +268,22 @@ export default function App() {
     );
   };
 
+  const storageSummary = (r: StorageReport | null) => {
+    if (!r) return null;
+    return (
+      <View style={styles.reportBox}>
+        <Text style={styles.reportText}>device total {formatBytes(r.deviceTotal)} · free {formatBytes(r.deviceFree)}</Text>
+        {r.roots.map((root) => <Text key={root.path} style={styles.reportText}>• {root.label}: {formatBytes(root.size)} · {root.files} files</Text>)}
+        {!!r.picked.length && <Text style={styles.reportText}>picked items: {r.picked.length}</Text>}
+        {r.picked.slice(0, 12).map((item, i) => <Text key={`${item.path}-${i}`} style={styles.reportText}>• {item.name}: {formatBytes(item.size)}</Text>)}
+        {!!r.largest.length && <Text style={styles.reportText}>largest Lotus files</Text>}
+        {r.largest.slice(0, 10).map((item, i) => <Text key={`${item.path}-${i}`} style={styles.reportText}>• {item.name}: {formatBytes(item.size)}</Text>)}
+        {r.note ? <Text style={styles.reportText}>{r.note}</Text> : null}
+        {r.errors.length ? <Text style={styles.reportText}>errors: {r.errors.join("; ")}</Text> : null}
+      </View>
+    );
+  };
+
   const askPanel = (
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0} style={styles.panel}>
       <FlatList
@@ -277,7 +322,26 @@ export default function App() {
       {!!scanProgress && <Text style={styles.progress}>{scanProgress}</Text>}
       {reportSummary(scanReport)}
       {(scanReport?.findings || []).slice(0, 80).map(renderFinding)}
-      <Text style={styles.foot}>iOS limits scans to Lotus storage or files you explicitly pick.</Text>
+
+      <Text style={styles.section}>Storage audit</Text>
+      <Text style={styles.sub}>Audit storage Lotus can see. iOS does not let apps list other apps or uninstall them.</Text>
+      <View style={styles.chips}>
+        <Pressable style={[styles.btn, styles.btnGhost, storageBusy && { opacity: 0.5 }]} onPress={() => runStorageAudit("app")} disabled={storageBusy}>
+          <Text style={styles.btnGhostText}>Audit Lotus storage</Text>
+        </Pressable>
+        <Pressable style={[styles.btn, styles.btnGhost, storageBusy && { opacity: 0.5 }]} onPress={() => runStorageAudit("pick")} disabled={storageBusy}>
+          <Text style={styles.btnGhostText}>Audit picked files</Text>
+        </Pressable>
+        <Pressable style={[styles.btn, styles.btnGhost]} onPress={() => openIOSSettings("General&path=STORAGE")}>
+          <Text style={styles.btnGhostText}>iPhone Storage</Text>
+        </Pressable>
+        <Pressable style={[styles.btn, styles.btnGhost]} onPress={() => openIOSSettings("STORE")}>
+          <Text style={styles.btnGhostText}>App Store</Text>
+        </Pressable>
+      </View>
+      {!!storageProgress && <Text style={styles.progress}>{storageProgress}</Text>}
+      {storageSummary(storageReport)}
+      <Text style={styles.foot}>External storage appears only if iOS exposes it through the Files picker.</Text>
     </ScrollView>
   );
 

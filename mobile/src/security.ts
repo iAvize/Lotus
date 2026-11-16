@@ -270,3 +270,97 @@ export function nextPrivacyStatus(status: string): string {
   const i = PRIVACY_STATUSES.indexOf(status as any);
   return PRIVACY_STATUSES[(i + 1) % PRIVACY_STATUSES.length];
 }
+
+export type StorageItem = { path: string; name: string; size: number };
+export type StorageReport = {
+  deviceTotal?: number;
+  deviceFree?: number;
+  roots: { label: string; path: string; size: number; files: number; largest: StorageItem[] }[];
+  picked: StorageItem[];
+  largest: StorageItem[];
+  note: string;
+  errors: string[];
+};
+
+export function formatBytes(n?: number): string {
+  if (!n && n !== 0) return "—";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let v = n;
+  let i = 0;
+  while (v >= 1024 && i < units.length - 1) { v /= 1024; i += 1; }
+  return `${v.toFixed(v >= 10 || i === 0 ? 0 : 1)} ${units[i]}`;
+}
+
+async function deviceStorage(): Promise<{ deviceTotal?: number; deviceFree?: number }> {
+  const fs: any = FileSystem;
+  const out: any = {};
+  try { if (fs.getTotalDiskStorageAsync) out.deviceTotal = await fs.getTotalDiskStorageAsync(); } catch {}
+  try { if (fs.getFreeDiskStorageAsync) out.deviceFree = await fs.getFreeDiskStorageAsync(); } catch {}
+  return out;
+}
+
+async function measureDir(path: string, label: string, progress?: (msg: string) => void): Promise<{ label: string; path: string; size: number; files: number; largest: StorageItem[] }> {
+  const files: StorageItem[] = [];
+  const counters = { size: 0, count: 0 };
+  const walkSize = async (dir: string, depth: number): Promise<void> => {
+    if (depth > 5 || counters.count >= 1200) return;
+    let names: string[] = [];
+    try { names = await FileSystem.readDirectoryAsync(dir); } catch { return; }
+    for (const name of names) {
+      if (counters.count >= 1200) break;
+      const p = `${dir.replace(/\/$/, "")}/${name}`;
+      try {
+        const info: any = await FileSystem.getInfoAsync(p);
+        if (!info?.exists) continue;
+        if (info.isDirectory) await walkSize(p, depth + 1);
+        else {
+          const size = Number(info.size || 0);
+          counters.size += size;
+          counters.count += 1;
+          if (size > 0) files.push({ path: p, name, size });
+          progress?.(`Measuring ${name}`);
+        }
+      } catch {}
+    }
+  };
+  await walkSize(path, 0);
+  files.sort((a, b) => b.size - a.size);
+  return { label, path, size: counters.size, files: counters.count, largest: files.slice(0, 8) };
+}
+
+export async function auditAppStorage(progress?: (msg: string) => void): Promise<StorageReport> {
+  const roots = [
+    { label: "Lotus documents", path: FileSystem.documentDirectory || "" },
+    { label: "Lotus cache", path: FileSystem.cacheDirectory || "" },
+  ].filter((r) => r.path);
+  const measured = [] as Awaited<ReturnType<typeof measureDir>>[];
+  for (const root of roots) measured.push(await measureDir(root.path, root.label, progress));
+  const dev = await deviceStorage();
+  const largest = measured.flatMap((r) => r.largest).sort((a, b) => b.size - a.size).slice(0, 12);
+  return {
+    ...dev,
+    roots: measured,
+    picked: [],
+    largest,
+    errors: [],
+    note: "iOS does not expose other apps' storage or installed-app inventory to Lotus. For unused apps/offload, use iPhone Settings → General → iPhone Storage or App Store settings; Lotus can audit only its own storage and files you pick.",
+  } as StorageReport;
+}
+
+export async function pickStorageAudit(progress?: (msg: string) => void): Promise<StorageReport | null> {
+  const res = await DocumentPicker.getDocumentAsync({ type: "*/*", multiple: true, copyToCacheDirectory: false });
+  if (res.canceled || !res.assets?.length) return null;
+  const picked: StorageItem[] = [];
+  const errors: string[] = [];
+  for (const asset of res.assets.slice(0, 100)) {
+    progress?.(`Measuring ${asset.name || asset.uri}`);
+    let size = Number((asset as any).size || 0);
+    if (!size) {
+      try { size = Number((await FileSystem.getInfoAsync(asset.uri) as any)?.size || 0); } catch {}
+    }
+    picked.push({ path: asset.uri, name: asset.name || asset.uri.split("/").pop() || "item", size });
+  }
+  picked.sort((a, b) => b.size - a.size);
+  const dev = await deviceStorage();
+  return { ...dev, roots: [], picked, largest: [], errors, note: "Picked-item storage audit. External drives appear here only if iOS exposes them through the Files picker." } as StorageReport;
+}

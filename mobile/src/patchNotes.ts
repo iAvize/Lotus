@@ -6,6 +6,15 @@ export type PatchNote = {
 
 export const PATCH_NOTES: PatchNote[] = [
   {
+    version: "0.1.0-beta.4",
+    date: "2026-11-15",
+    notes: [
+      "Files orb storage audit: device free/total space, Lotus storage breakdown, largest files, picked-item audit",
+      "Shortcuts to iPhone Storage and App Store settings for manual offload/uninstall",
+      "iOS limit documented: apps cannot enumerate or uninstall other installed apps",
+    ],
+  },
+  {
     version: "0.1.0-beta.3",
     date: "2026-11-15",
     notes: [
