@@ -31,7 +31,7 @@ for root, _, files in os.walk("_expo/static/js/$PLATFORM"):
             bundle = os.path.join(root, f).replace(os.sep, "/")
 assert bundle, "no $PLATFORM bundle exported"
 digest = base64.urlsafe_b64encode(hashlib.sha256(open(bundle, "rb").read()).digest()).decode().rstrip("=")
-m = {"id": str(uuid.uuid4()), "createdAt": datetime.now(timezone.utc).isoformat(),
+m = {"id": str(uuid.uuid4()), "createdAt": (lambda n: n.strftime("%Y-%m-%dT%H:%M:%S.") + f"{n.microsecond // 1000:03d}Z")(datetime.now(timezone.utc)),
      "runtimeVersion": json.load(open("$(pwd)/$OUT/../app.json"))["expo"]["version"],
      "launchAsset": {"key": "bundle", "contentType": "application/javascript",
                      "url": "$BASE_URL/" + bundle, "hash": digest},

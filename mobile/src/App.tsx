@@ -54,7 +54,7 @@ import {
 } from "./store";
 import { PALETTES, Palette, THEME_NAMES, ThemeName } from "./theme";
 
-const VERSION = "0.1.0-beta.11";
+const VERSION = "0.1.0-beta.12";
 const AI_STUDIO_URL = "https://aistudio.google.com/apikey";
 const SUPPORT_EMAIL = "bizwithavize@outlook.com";
 const REPORT_ENDPOINT = `https://formsubmit.co/ajax/${SUPPORT_EMAIL}`;
@@ -101,6 +101,7 @@ export default function App() {
   const [reportBusy, setReportBusy] = useState(false);
   const [reportStatus, setReportStatus] = useState("");
   const [updateReady, setUpdateReady] = useState(false);
+  const [updLog, setUpdLog] = useState("");
   const [kbHeight, setKbHeight] = useState(0);
   const listRef = useRef<FlatList>(null);
 
@@ -123,6 +124,14 @@ export default function App() {
     const kbShow = Keyboard.addListener("keyboardDidShow", (e) => setKbHeight(e.endCoordinates.height));
     const kbHide = Keyboard.addListener("keyboardDidHide", () => setKbHeight(0));
     if (Updates.isEnabled) {
+      Updates.readLogEntriesAsync(86400000)
+        .then((entries) => {
+          const tail = entries.slice(-8)
+            .map((e: any) => `${e.code || ""}:${String(e.message || "").slice(0, 90)}`)
+            .join(" | ");
+          if (tail) setUpdLog(tail);
+        })
+        .catch(() => {});
       (async () => {
         try {
           const check = await Updates.checkForUpdateAsync();
@@ -155,8 +164,10 @@ export default function App() {
     `Install: ${iid || "…"}`,
     `Section: ${section}`,
     `Update: ${Updates.isEmbeddedLaunch ? "embedded" : "ota:" + (Updates.updateId || "?")}`,
+    Updates.isEmergencyLaunch ? `Emergency: ${Updates.emergencyLaunchReason || "?"}` : "",
+    updLog ? `Updates log: ${updLog}` : "",
     lastError ? `Last error: ${lastError}` : "",
-  ].filter(Boolean).join("\n"), [iid, lastError, section]);
+  ].filter(Boolean).join("\n"), [iid, lastError, section, updLog]);
 
   const feedbackMailto = useCallback(() => {
     const body = `${diagnostics()}\n\nWhat happened?\n\nScreenshot/video: attach before sending — tap the paperclip in Mail. Lotus cannot attach files directly.\n\n`;
@@ -165,37 +176,33 @@ export default function App() {
 
   const sendReport = useCallback(async () => {
     if (reportBusy) return;
-    setReportBusy(true);
-    setReportStatus("Sending…");
     const body = `${diagnostics()}\n\n---- pasted error/crash report ----\n${reportDraft.trim() || "(none pasted)"}`;
-    try {
-      const res = await fetch(REPORT_ENDPOINT, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          Origin: "https://github.com",
-          Referer: "https://github.com/iAvize/Lotus",
-        },
-        body: JSON.stringify({
-          _subject: `Lotus Beta crash report (v${VERSION})`,
-          _captcha: "false",
-          message: body,
-        }),
-      });
+    // Fire in the background — the UI confirms immediately; the request can
+    // take seconds on the mail relay and nobody should wait on it.
+    setReportStatus("Queued — sending in the background.");
+    setReportDraft("");
+    setReportOpen(false);
+    fetch(REPORT_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        Origin: "https://github.com",
+        Referer: "https://github.com/iAvize/Lotus",
+      },
+      body: JSON.stringify({
+        _subject: `Lotus Beta crash report (v${VERSION})`,
+        _captcha: "false",
+        message: body,
+      }),
+    }).then(async (res) => {
       const data = await res.json().catch(() => ({}));
-      if (res.ok && String(data.success) === "true") {
-        setReportStatus("Sent — the developer will review it as soon as possible.");
-        setReportDraft("");
-        setReportOpen(false);
-      } else {
-        setReportStatus("Couldn't send — try again, or use Copy diagnostics and email it via Feedback.");
-      }
-    } catch {
+      setReportStatus(res.ok && String(data.success) === "true"
+        ? "Sent — the developer will review it as soon as possible."
+        : "Couldn't send — try again, or use Copy diagnostics and email it via Feedback.");
+    }).catch(() => {
       setReportStatus("Couldn't send — check your connection, or use Copy diagnostics and email it via Feedback.");
-    } finally {
-      setReportBusy(false);
-    }
+    });
   }, [reportBusy, reportDraft, diagnostics]);
 
   const copyDiagnostics = useCallback(async () => {

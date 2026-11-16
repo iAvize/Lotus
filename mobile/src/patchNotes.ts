@@ -6,6 +6,15 @@ export type PatchNote = {
 
 export const PATCH_NOTES: PatchNote[] = [
   {
+    version: "0.1.0-beta.12",
+    date: "2026-11-16",
+    notes: [
+      "Fixed the OTA loop — the update server timestamp format confused the client into re-prompting forever",
+      "Diagnostics now include the internal update log and emergency-launch reason",
+      "Crash reports send in the background — the screen confirms instantly instead of waiting on the relay",
+    ],
+  },
+  {
     version: "0.1.0-beta.11",
     date: "2026-11-16",
     notes: [
