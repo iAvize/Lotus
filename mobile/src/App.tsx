@@ -16,6 +16,7 @@ import {
 } from "react-native";
 import { generateReply } from "./gemini";
 import * as Clipboard from "expo-clipboard";
+import * as Updates from "expo-updates";
 import { ARCHETYPES, voicePrompt } from "./personality";
 import { PATCH_NOTES } from "./patchNotes";
 import {
@@ -50,7 +51,7 @@ import {
 } from "./store";
 import { PALETTES, Palette, THEME_NAMES, ThemeName } from "./theme";
 
-const VERSION = "0.1.0-beta.5";
+const VERSION = "0.1.0-beta.6";
 const AI_STUDIO_URL = "https://aistudio.google.com/apikey";
 const SUPPORT_EMAIL = "bizwithavize@outlook.com";
 const REPORT_ENDPOINT = `https://formsubmit.co/ajax/${SUPPORT_EMAIL}`;
@@ -96,6 +97,7 @@ export default function App() {
   const [reportDraft, setReportDraft] = useState("");
   const [reportBusy, setReportBusy] = useState(false);
   const [reportStatus, setReportStatus] = useState("");
+  const [updateReady, setUpdateReady] = useState(false);
   const listRef = useRef<FlatList>(null);
 
   const C = PALETTES[themeName] || PALETTES.purple;
@@ -114,6 +116,17 @@ export default function App() {
       setPrivacyStateLocal(await getPrivacyState());
       setSection(k ? "ask" : "settings");
     })();
+    if (Updates.isEnabled) {
+      (async () => {
+        try {
+          const check = await Updates.checkForUpdateAsync();
+          if (check.isAvailable) {
+            const fetched = await Updates.fetchUpdateAsync();
+            if (fetched.isNew) setUpdateReady(true);
+          }
+        } catch {}
+      })();
+    }
   }, []);
 
   const openLink = useCallback((url: string) => {
@@ -548,6 +561,11 @@ export default function App() {
   return (
     <SafeAreaView style={styles.root}>
       <StatusBar barStyle="light-content" />
+      {updateReady && (
+        <Pressable style={styles.updateBanner} onPress={() => Updates.reloadAsync()}>
+          <Text style={styles.updateBannerText}>Update ready — tap to restart and apply</Text>
+        </Pressable>
+      )}
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>◆ LOTUS</Text>
@@ -609,6 +627,8 @@ function createStyles(c: Palette) {
     sendBtn: { marginLeft: 8, backgroundColor: c.accent, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 11 },
     sendText: { color: "#fff", fontSize: 15, fontWeight: "700" },
     footSmall: { color: c.sub, fontSize: 10, textAlign: "center", paddingBottom: 6 },
+    updateBanner: { backgroundColor: c.accent, paddingVertical: 10, paddingHorizontal: 14 },
+    updateBannerText: { color: "#fff", fontWeight: "800", fontSize: 13, textAlign: "center" },
     foot: { color: c.sub, fontSize: 10, marginTop: 16 },
     section: { color: c.accentLight, fontSize: 15, fontWeight: "700", marginBottom: 6, marginTop: 8 },
     input: { color: c.text, backgroundColor: c.input, borderWidth: 1, borderColor: c.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 11, fontSize: 14, marginBottom: 10 },

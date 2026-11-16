@@ -6,6 +6,15 @@ export type PatchNote = {
 
 export const PATCH_NOTES: PatchNote[] = [
   {
+    version: "0.1.0-beta.6",
+    date: "2026-11-15",
+    notes: [
+      "Report error sends silently to the business inbox — paste the error, tap Send, done (no Mail or GitHub)",
+      "Update-ready banner: new updates offer 'tap to restart and apply' like desktop",
+      "Self-hosted OTA updates via GitHub Pages — app checks for updates on every launch",
+    ],
+  },
+  {
     version: "0.1.0-beta.5",
     date: "2026-11-15",
     notes: [
