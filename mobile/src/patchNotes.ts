@@ -6,6 +6,14 @@ export type PatchNote = {
 
 export const PATCH_NOTES: PatchNote[] = [
   {
+    version: "0.1.0-beta.15",
+    date: "2026-11-16",
+    notes: [
+      "OTA updates now work over service data, not just WiFi: the update check retries with backoff on slow networks and re-runs every time the app comes to the foreground",
+      "Native builds now wait up to 10s for the update manifest on launch (was 3s), so slow cellular pulls land instead of timing out",
+    ],
+  },
+  {
     version: "0.1.0-beta.14",
     date: "2026-11-16",
     notes: [

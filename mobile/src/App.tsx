@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
+  AppState,
   BackHandler,
   FlatList,
   Keyboard,
@@ -54,7 +55,7 @@ import {
 } from "./store";
 import { PALETTES, Palette, THEME_NAMES, ThemeName } from "./theme";
 
-const VERSION = "0.1.0-beta.14";
+const VERSION = "0.1.0-beta.15";
 const AI_STUDIO_URL = "https://aistudio.google.com/apikey";
 const SUPPORT_EMAIL = "bizwithavize@outlook.com";
 const REPORT_ENDPOINT = `https://formsubmit.co/ajax/${SUPPORT_EMAIL}`;
@@ -108,6 +109,30 @@ export default function App() {
   const C = PALETTES[themeName] || PALETTES.purple;
   const styles = useMemo(() => createStyles(C), [themeName]);
 
+  // Check, fetch, and offer restart for an OTA update. Retries with backoff so a
+  // slow or flaky network (service data) doesn't leave the app stale until the
+  // next launch, and re-runs on foreground for the same reason.
+  const checkForUpdates = useCallback(async (attempt = 1) => {
+    if (!Updates.isEnabled) return;
+    try {
+      const check = await Updates.checkForUpdateAsync();
+      if (check.isAvailable) {
+        const fetched = await Updates.fetchUpdateAsync();
+        const fetchedId = (fetched.isNew && fetched.manifest?.id) || "";
+        const seenId = (await AsyncStorage.getItem("lotus:seen_update")) || "";
+        // Offer the restart banner once per update id. Native launch-wait
+        // applies it on the next cold start regardless, so never re-prompt —
+        // that prevents banner loops if a restart lands on embedded again.
+        if (fetched.isNew && fetchedId && fetchedId !== seenId) {
+          await AsyncStorage.setItem("lotus:seen_update", fetchedId);
+          setUpdateReady(true);
+        }
+      }
+    } catch {
+      if (attempt < 4) setTimeout(() => checkForUpdates(attempt + 1), 8000 * attempt);
+    }
+  }, []);
+
   useEffect(() => {
     (async () => {
       setMsgs(await loadHistory());
@@ -123,6 +148,9 @@ export default function App() {
     })();
     const kbShow = Keyboard.addListener("keyboardDidShow", (e) => setKbHeight(e.endCoordinates.height));
     const kbHide = Keyboard.addListener("keyboardDidHide", () => setKbHeight(0));
+    const fg = AppState.addEventListener("change", (s) => {
+      if (s === "active") checkForUpdates();
+    });
     if (Updates.isEnabled) {
       Updates.readLogEntriesAsync(86400000)
         .then((entries) => {
@@ -132,26 +160,10 @@ export default function App() {
           if (tail) setUpdLog(tail);
         })
         .catch(() => {});
-      (async () => {
-        try {
-          const check = await Updates.checkForUpdateAsync();
-          if (check.isAvailable) {
-            const fetched = await Updates.fetchUpdateAsync();
-            const fetchedId = (fetched.isNew && fetched.manifest?.id) || "";
-            const seenId = (await AsyncStorage.getItem("lotus:seen_update")) || "";
-            // Offer the restart banner once per update id. Native launch-wait
-            // applies it on the next cold start regardless, so never re-prompt —
-            // that prevents banner loops if a restart lands on embedded again.
-            if (fetched.isNew && fetchedId && fetchedId !== seenId) {
-              await AsyncStorage.setItem("lotus:seen_update", fetchedId);
-              setUpdateReady(true);
-            }
-          }
-        } catch {}
-      })();
+      checkForUpdates();
     }
-    return () => { kbShow.remove(); kbHide.remove(); };
-  }, []);
+    return () => { kbShow.remove(); kbHide.remove(); fg.remove(); };
+  }, [checkForUpdates]);
 
   const openLink = useCallback((url: string) => {
     Linking.openURL(url).catch(() => {});
@@ -163,6 +175,7 @@ export default function App() {
     `Install: ${iid || "…"}`,
     `Section: ${section}`,
     `Update: ${Updates.isEmbeddedLaunch ? "embedded" : "ota:" + (Updates.updateId || "?")}`,
+    `Runtime: ${Updates.runtimeVersion || "?"}`,
     Updates.isEmergencyLaunch ? `Emergency: ${Updates.emergencyLaunchReason || "?"}` : "",
     updLog ? `Updates log: ${updLog}` : "",
     lastError ? `Last error: ${lastError}` : "",

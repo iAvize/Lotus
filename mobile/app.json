@@ -48,7 +48,7 @@
     "updates": {
       "url": "https://lotus-updates.web.app/manifest.json",
       "checkAutomatically": "ON_LOAD",
-      "fallbackToCacheTimeout": 3000,
+      "fallbackToCacheTimeout": 10000,
       "requestHeaders": {
         "expo-channel-name": "beta"
       }
