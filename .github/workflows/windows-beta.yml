@@ -49,12 +49,12 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force release-assets | Out-Null
-          Copy-Item dist/Lotus Beta.exe release-assets/Lotus.Beta.exe
-          Copy-Item dist/Lotus Beta.zip release-assets/Lotus.Beta.zip
+          Copy-Item "dist/Lotus Beta.exe" "release-assets/Lotus.Beta.exe"
+          Copy-Item "dist/Lotus Beta.zip" "release-assets/Lotus.Beta.zip"
 
       - name: Upload Windows assets
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
-        run: gh release upload "$env:TAG" release-assets/* --clobber
+        run: gh release upload "$env:TAG" "release-assets/Lotus.Beta.exe" "release-assets/Lotus.Beta.zip" --clobber
