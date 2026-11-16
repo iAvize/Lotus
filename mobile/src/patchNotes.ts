@@ -6,6 +6,15 @@ export type PatchNote = {
 
 export const PATCH_NOTES: PatchNote[] = [
   {
+    version: "0.1.0-beta.9",
+    date: "2026-11-16",
+    notes: [
+      "Keyboard fix round 2 — edge-to-edge blocks window resize, so the composer now pads by real keyboard height",
+      "Faster replies — the app remembers which Gemini model answered and tries it first",
+      "OTA updates actually work now — the update server serves a real protocol manifest",
+    ],
+  },
+  {
     version: "0.1.0-beta.8",
     date: "2026-11-16",
     notes: [

@@ -53,7 +53,7 @@ import {
 } from "./store";
 import { PALETTES, Palette, THEME_NAMES, ThemeName } from "./theme";
 
-const VERSION = "0.1.0-beta.8";
+const VERSION = "0.1.0-beta.9";
 const AI_STUDIO_URL = "https://aistudio.google.com/apikey";
 const SUPPORT_EMAIL = "bizwithavize@outlook.com";
 const REPORT_ENDPOINT = `https://formsubmit.co/ajax/${SUPPORT_EMAIL}`;
@@ -100,6 +100,7 @@ export default function App() {
   const [reportBusy, setReportBusy] = useState(false);
   const [reportStatus, setReportStatus] = useState("");
   const [updateReady, setUpdateReady] = useState(false);
+  const [kbHeight, setKbHeight] = useState(0);
   const listRef = useRef<FlatList>(null);
 
   const C = PALETTES[themeName] || PALETTES.purple;
@@ -118,6 +119,8 @@ export default function App() {
       setPrivacyStateLocal(await getPrivacyState());
       setSection(k ? "ask" : "settings");
     })();
+    const kbShow = Keyboard.addListener("keyboardDidShow", (e) => setKbHeight(e.endCoordinates.height));
+    const kbHide = Keyboard.addListener("keyboardDidHide", () => setKbHeight(0));
     if (Updates.isEnabled) {
       (async () => {
         try {
@@ -129,6 +132,7 @@ export default function App() {
         } catch {}
       })();
     }
+    return () => { kbShow.remove(); kbHide.remove(); };
   }, []);
 
   const openLink = useCallback((url: string) => {
@@ -384,8 +388,8 @@ export default function App() {
     );
   };
 
-  const askPanel = (
-    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0} style={styles.panel}>
+  const askInner = (
+    <>
       <FlatList
         ref={listRef}
         style={styles.list}
@@ -404,6 +408,16 @@ export default function App() {
         </Pressable>
       </View>
       <Text style={styles.footSmall}>v{VERSION}</Text>
+    </>
+  );
+  // Android 16 edge-to-edge no longer resizes the window for the keyboard, so
+  // KeyboardAvoidingView can't see the inset — pad the panel by the reported
+  // keyboard height instead. iOS keeps the avoiding view.
+  const askPanel = Platform.OS === "android" ? (
+    <View style={[styles.panel, { paddingBottom: kbHeight }]}>{askInner}</View>
+  ) : (
+    <KeyboardAvoidingView behavior="padding" keyboardVerticalOffset={90} style={styles.panel}>
+      {askInner}
     </KeyboardAvoidingView>
   );
 

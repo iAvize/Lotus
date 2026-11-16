@@ -2,6 +2,10 @@
  *  The user's own key calls the API directly; nothing is proxied or stored
  *  anywhere but the device keychain.
  */
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+const KEY_MODEL = "lotus:last_model";
+const REQUEST_TIMEOUT_MS = 25000;
 
 const MODELS = [
   "gemini-3.8-flash",
@@ -31,8 +35,15 @@ export async function generateReply(
     parts: [{ text: m.content }],
   }));
 
+  // Try the last model that worked first — dead/slow models ahead of it in
+  // the ladder cost a full round trip each otherwise.
+  const lastGood = (await AsyncStorage.getItem(KEY_MODEL)) || "";
+  const order = lastGood && MODELS.includes(lastGood)
+    ? [lastGood, ...MODELS.filter((m) => m !== lastGood)]
+    : MODELS;
+
   let lastErr = "unknown";
-  for (const model of MODELS) {
+  for (const model of order) {
     try {
       const url =
         `https://generativelanguage.googleapis.com/v1beta/models/` +
@@ -40,6 +51,7 @@ export async function generateReply(
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         body: JSON.stringify({
           contents,
           systemInstruction: { parts: [{ text: voice ? `${SYSTEM}\n\n${voice}` : SYSTEM }] },
@@ -56,7 +68,10 @@ export async function generateReply(
         data?.candidates?.[0]?.content?.parts
           ?.map((p: any) => p.text || "")
           .join("") || "";
-      if (text.trim()) return text.trim();
+      if (text.trim()) {
+        AsyncStorage.setItem(KEY_MODEL, model).catch(() => {});
+        return text.trim();
+      }
       lastErr = `${model}: empty response`;
     } catch (e: any) {
       lastErr = `${model}: ${e?.message || e}`;
