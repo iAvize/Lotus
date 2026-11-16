@@ -15,7 +15,7 @@ from urllib.parse import quote
 
 from . import __version__, crashlog, db
 
-DEFAULT_FEEDBACK_EMAIL = "akaavize@outlook.com"
+DEFAULT_FEEDBACK_EMAIL = "bizwithavize@outlook.com"
 
 
 def feedback_email() -> str:

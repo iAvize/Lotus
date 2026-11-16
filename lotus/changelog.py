@@ -8,6 +8,8 @@ from __future__ import annotations
 from . import db
 
 RELEASES = [
+    {"version": "0.1.0-beta.69", "date": "2026-11-15",
+     "notes": ["Crash reports + feedback now go to the business inbox"]},
     {"version": "0.1.0-beta.68", "date": "2026-11-15",
      "notes": ["New Report / Feedback section — one-tap crash reports email full diagnostics, no writing needed", "Feedback keeps the detailed path; screenshots/videos stay optional attachments", "Mobile Report button now emails the developer with prefilled diagnostics"]},
     {"version": "0.1.0-beta.67", "date": "2026-11-16",

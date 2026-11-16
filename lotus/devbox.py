@@ -52,7 +52,8 @@ _NOT_CONFIGURED = {
 
 # Files/dirs never copied official -> staging (secrets and runtime data stay out of the VM).
 _SYNC_EXCLUDE_DIRS = (".git", ".venv", "memory", "build", "dist", "__pycache__",
-                      "_lotus_update_staging", "node_modules", ".expo")
+                      "_lotus_update_staging", "node_modules", ".expo",
+                      "ios", "android")
 _SYNC_EXCLUDE_FILES = ("api_keys.json", "devbox.json", "*.pyc", "*.log")
 
 

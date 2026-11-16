@@ -52,7 +52,7 @@ import { PALETTES, Palette, THEME_NAMES, ThemeName } from "./theme";
 
 const VERSION = "0.1.0-beta.5";
 const AI_STUDIO_URL = "https://aistudio.google.com/apikey";
-const SUPPORT_EMAIL = "akaavize@outlook.com";
+const SUPPORT_EMAIL = "bizwithavize@outlook.com";
 
 type Section = "ask" | "files" | "privacy" | "personality" | "patches" | "settings";
 type GithubReport = ScanReport & { repo?: string; branch?: string; truncated?: boolean };
