@@ -31,7 +31,6 @@
     "android": {
       "package": "com.avize.lotus.beta",
       "versionCode": 2,
-      "edgeToEdgeEnabled": true,
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -42,10 +41,6 @@
       "barStyle": "light-content",
       "backgroundColor": "#080512",
       "translucent": true
-    },
-    "androidNavigationBar": {
-      "barStyle": "light-content",
-      "backgroundColor": "#080512"
     },
     "runtimeVersion": {
       "policy": "appVersion"

@@ -6,6 +6,14 @@ export type PatchNote = {
 
 export const PATCH_NOTES: PatchNote[] = [
   {
+    version: "0.1.0-beta.8",
+    date: "2026-11-16",
+    notes: [
+      "Android keyboard now lifts the composer while typing and drops back when the reply lands",
+      "Gemini model ladder refreshed — dead model names removed, flash-latest fallback added",
+    ],
+  },
+  {
     version: "0.1.0-beta.7",
     date: "2026-11-15",
     notes: [

@@ -5,10 +5,10 @@
 
 const MODELS = [
   "gemini-3.8-flash",
-  "gemini-3.7-flash",
+  "gemini-3.5-flash",
+  "gemini-3.5-flash-lite",
+  "gemini-flash-latest",
   "gemini-2.5-flash",
-  "gemini-2.5-flash-lite",
-  "gemini-2.0-flash",
 ];
 
 const SYSTEM = `You are Lotus, a cybersecurity AI assistant (mobile beta).

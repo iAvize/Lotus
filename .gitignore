@@ -40,3 +40,7 @@ mobile/dist/
 mobile/web-build/
 mobile/ios/
 mobile/android/
+mobile/android/
+mobile/ios/
+mobile/dist-pages/
+mobile/dist-ios-tmp/

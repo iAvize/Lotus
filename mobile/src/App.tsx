@@ -3,6 +3,7 @@ import {
   Alert,
   BackHandler,
   FlatList,
+  Keyboard,
   KeyboardAvoidingView,
   Linking,
   Platform,
@@ -52,7 +53,7 @@ import {
 } from "./store";
 import { PALETTES, Palette, THEME_NAMES, ThemeName } from "./theme";
 
-const VERSION = "0.1.0-beta.7";
+const VERSION = "0.1.0-beta.8";
 const AI_STUDIO_URL = "https://aistudio.google.com/apikey";
 const SUPPORT_EMAIL = "bizwithavize@outlook.com";
 const REPORT_ENDPOINT = `https://formsubmit.co/ajax/${SUPPORT_EMAIL}`;
@@ -214,6 +215,7 @@ export default function App() {
       saveHistory(updated);
     } finally {
       setThinking(false);
+      if (Platform.OS === "android") Keyboard.dismiss();
     }
   }, [draft, thinking, key, msgs, person]);
 
@@ -383,7 +385,7 @@ export default function App() {
   };
 
   const askPanel = (
-    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0} style={styles.panel}>
+    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0} style={styles.panel}>
       <FlatList
         ref={listRef}
         style={styles.list}
