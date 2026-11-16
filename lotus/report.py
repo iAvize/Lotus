@@ -7,10 +7,10 @@ the user's mail app pre-filled (screenshots/videos attach there).
 """
 from __future__ import annotations
 
-import json
 import platform
-import urllib.request
 from urllib.parse import quote
+
+import requests
 
 from . import __version__, crashlog, db
 
@@ -57,21 +57,19 @@ def send_report(error_text: str = "", timeout: int = 15) -> bool:
     when the report was accepted; callers fall back to mailto on False.
     """
     try:
-        req = urllib.request.Request(
+        resp = requests.post(
             f"https://formsubmit.co/ajax/{feedback_email()}",
-            data=json.dumps({
+            json={
                 "_subject": f"Lotus Beta crash report (v{__version__})",
                 "_captcha": "false",
                 "message": _report_body(error_text),
-            }).encode(),
-            headers={"Content-Type": "application/json",
-                     "Accept": "application/json",
+            },
+            headers={"Accept": "application/json",
                      "Origin": "https://github.com",
                      "Referer": "https://github.com/iAvize/Lotus"},
+            timeout=timeout,
         )
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            data = json.loads(resp.read() or b"{}")
-            return str(data.get("success")).lower() == "true"
+        return str(resp.json().get("success")).lower() == "true"
     except Exception:
         return False
 

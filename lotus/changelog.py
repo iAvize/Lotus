@@ -8,6 +8,8 @@ from __future__ import annotations
 from . import db
 
 RELEASES = [
+    {"version": "0.1.0-beta.71", "date": "2026-11-15",
+     "notes": ["Fixed crash reports not sending on macOS — report POST now uses certifi-backed requests (urllib had no CA certs on framework Python/frozen app)", "FormSubmit relay confirmed live"]},
     {"version": "0.1.0-beta.70", "date": "2026-11-15",
      "notes": ["Crash reports now send silently in-app — paste the error, tap Send, done in seconds (no mail app, no GitHub)", "Falls back to the mail app automatically if the report relay is unreachable", "Mobile Report shows an in-app paste field + sent confirmation"]},
     {"version": "0.1.0-beta.69", "date": "2026-11-15",
