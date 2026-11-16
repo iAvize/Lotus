@@ -6,6 +6,14 @@ export type PatchNote = {
 
 export const PATCH_NOTES: PatchNote[] = [
   {
+    version: "0.1.0-beta.11",
+    date: "2026-11-16",
+    notes: [
+      "Banner fix round 2 — remember the fetched update id and stay quiet once running a downloaded bundle",
+      "Diagnostics now report whether the app is running embedded or OTA code",
+    ],
+  },
+  {
     version: "0.1.0-beta.10",
     date: "2026-11-16",
     notes: [

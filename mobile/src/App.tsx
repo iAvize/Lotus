@@ -16,6 +16,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { generateReply } from "./gemini";
 import * as Clipboard from "expo-clipboard";
 import * as Updates from "expo-updates";
@@ -53,7 +54,7 @@ import {
 } from "./store";
 import { PALETTES, Palette, THEME_NAMES, ThemeName } from "./theme";
 
-const VERSION = "0.1.0-beta.10";
+const VERSION = "0.1.0-beta.11";
 const AI_STUDIO_URL = "https://aistudio.google.com/apikey";
 const SUPPORT_EMAIL = "bizwithavize@outlook.com";
 const REPORT_ENDPOINT = `https://formsubmit.co/ajax/${SUPPORT_EMAIL}`;
@@ -127,11 +128,16 @@ export default function App() {
           const check = await Updates.checkForUpdateAsync();
           if (check.isAvailable) {
             const fetched = await Updates.fetchUpdateAsync();
-            // After restart the check still reports the update we're already
-            // running — only prompt when it's genuinely a different update.
-            if (fetched.isNew && fetched.manifest?.id !== Updates.updateId) {
-              setUpdateReady(true);
+            const fetchedId = (fetched.isNew && fetched.manifest?.id) || "";
+            const seenId = (await AsyncStorage.getItem("lotus:seen_update")) || "";
+            if (fetchedId && fetchedId !== seenId) {
+              await AsyncStorage.setItem("lotus:seen_update", fetchedId);
             }
+            // The check can keep reporting the update we're already running —
+            // suppress it once we've seen this id while on a downloaded bundle.
+            const alreadyRunning =
+              !Updates.isEmbeddedLaunch && fetchedId !== "" && fetchedId === seenId;
+            if (fetched.isNew && fetchedId && !alreadyRunning) setUpdateReady(true);
           }
         } catch {}
       })();
@@ -148,6 +154,7 @@ export default function App() {
     `Platform: ${Platform.OS} ${Platform.Version ?? "unknown"}`,
     `Install: ${iid || "…"}`,
     `Section: ${section}`,
+    `Update: ${Updates.isEmbeddedLaunch ? "embedded" : "ota:" + (Updates.updateId || "?")}`,
     lastError ? `Last error: ${lastError}` : "",
   ].filter(Boolean).join("\n"), [iid, lastError, section]);
 
