@@ -2,7 +2,7 @@
   "expo": {
     "name": "Lotus Beta",
     "slug": "lotus-beta",
-    "version": "0.1.0-beta.2",
+    "version": "0.1.0-beta.3",
     "scheme": "lotusbeta",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
@@ -16,7 +16,7 @@
     "ios": {
       "bundleIdentifier": "com.avize.lotus.beta",
       "appleTeamId": "79TQF5SX8Z",
-      "buildNumber": "2",
+      "buildNumber": "3",
       "supportsTablet": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,

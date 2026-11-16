@@ -21,6 +21,7 @@ export class GeminiError extends Error {}
 export async function generateReply(
   apiKey: string,
   history: { role: string; content: string }[],
+  voice = "",
 ): Promise<string> {
   if (!apiKey) throw new GeminiError("No Gemini key set — open Settings to add one.");
 
@@ -40,7 +41,7 @@ export async function generateReply(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents,
-          systemInstruction: { parts: [{ text: SYSTEM }] },
+          systemInstruction: { parts: [{ text: voice ? `${SYSTEM}\n\n${voice}` : SYSTEM }] },
           generationConfig: { temperature: 0.7, maxOutputTokens: 2048 },
         }),
       });

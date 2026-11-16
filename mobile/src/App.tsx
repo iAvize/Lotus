@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -15,28 +15,52 @@ import {
   View,
 } from "react-native";
 import { generateReply } from "./gemini";
-import { Msg, getKey, installId, loadHistory, saveHistory, setKey } from "./store";
+import { ARCHETYPES, voicePrompt } from "./personality";
+import { PATCH_NOTES } from "./patchNotes";
+import {
+  BROKERS,
+  Finding,
+  ScanReport,
+  breachCheck,
+  nextPrivacyStatus,
+  pickAndScan,
+  scanAppStorage,
+  scanGitHubRepo,
+} from "./security";
+import {
+  Msg,
+  Personality,
+  PrivacyState,
+  getKey,
+  getPersonality,
+  getPrivacyState,
+  getTheme,
+  installId,
+  loadHistory,
+  saveHistory,
+  setKey,
+  setPersonality,
+  setPrivacyState,
+  setTheme,
+} from "./store";
+import { PALETTES, Palette, THEME_NAMES, ThemeName } from "./theme";
 
-const C = {
-  bg: "#080512",
-  panel: "rgba(23, 13, 43, 0.92)",
-  border: "#4c2a7d",
-  accent: "#8b5cf6",
-  accentLight: "#a78bfa",
-  text: "#e9d5ff",
-  sub: "#a78bfa",
-  input: "#130b24",
-};
-
-const VERSION = "0.1.0-beta.2";
+const VERSION = "0.1.0-beta.3";
 const AI_STUDIO_URL = "https://aistudio.google.com/apikey";
+const FEEDBACK_URL = "mailto:akaavize@outlook.com?subject=Lotus%20Beta%20Feedback";
+const REPORT_URL = "https://github.com/iAvize/Lotus/issues/new?title=Lotus%20Beta%20Report";
 
-type Section = "ask" | "logs" | "settings";
+type Section = "ask" | "files" | "privacy" | "personality" | "patches" | "settings";
+type GithubReport = ScanReport & { repo?: string; branch?: string; truncated?: boolean };
+type BreachResult = { breaches: string[]; pastes: number } | { error: string } | null;
 
 const SECTIONS: { id: Section; icon: string; label: string }[] = [
   { id: "ask", icon: "✦", label: "Ask" },
-  { id: "logs", icon: "≡", label: "Logs" },
-  { id: "settings", icon: "⚙", label: "Setup" },
+  { id: "files", icon: "▣", label: "Files" },
+  { id: "privacy", icon: "◉", label: "Privacy" },
+  { id: "personality", icon: "☺", label: "Persona" },
+  { id: "patches", icon: "≣", label: "Notes" },
+  { id: "settings", icon: "⚙", label: "Settings" },
 ];
 
 export default function App() {
@@ -47,7 +71,22 @@ export default function App() {
   const [key, setKeyState] = useState("");
   const [keyDraft, setKeyDraft] = useState("");
   const [iid, setIid] = useState("");
+  const [themeName, setThemeName] = useState<ThemeName>("purple");
+  const [person, setPerson] = useState<Personality>({ archetype: "neutral", notes: "" });
+  const [privacyState, setPrivacyStateLocal] = useState<PrivacyState>({});
+  const [scanReport, setScanReport] = useState<ScanReport | GithubReport | null>(null);
+  const [scanBusy, setScanBusy] = useState(false);
+  const [scanProgress, setScanProgress] = useState("");
+  const [githubInput, setGithubInput] = useState("");
+  const [githubReport, setGithubReport] = useState<GithubReport | null>(null);
+  const [githubBusy, setGithubBusy] = useState(false);
+  const [privacyEmail, setPrivacyEmail] = useState("");
+  const [breach, setBreach] = useState<BreachResult>(null);
+  const [privacyBusy, setPrivacyBusy] = useState(false);
   const listRef = useRef<FlatList>(null);
+
+  const C = PALETTES[themeName] || PALETTES.purple;
+  const styles = useMemo(() => createStyles(C), [themeName]);
 
   useEffect(() => {
     (async () => {
@@ -56,8 +95,16 @@ export default function App() {
       const k = await getKey();
       setKeyState(k);
       setKeyDraft(k);
+      const t = (await getTheme()) as ThemeName;
+      if (PALETTES[t]) setThemeName(t);
+      setPerson(await getPersonality());
+      setPrivacyStateLocal(await getPrivacyState());
       setSection(k ? "ask" : "settings");
     })();
+  }, []);
+
+  const openLink = useCallback((url: string) => {
+    Linking.openURL(url).catch(() => {});
   }, []);
 
   const send = useCallback(async () => {
@@ -72,21 +119,18 @@ export default function App() {
     setDraft("");
     setThinking(true);
     try {
-      const reply = await generateReply(key, next);
+      const reply = await generateReply(key, next, voicePrompt(person));
       const updated: Msg[] = [...next, { role: "assistant", content: reply }];
       setMsgs(updated);
       saveHistory(updated);
     } catch (e: any) {
-      const updated: Msg[] = [
-        ...next,
-        { role: "assistant", content: `I hit an error: ${e?.message || e}` },
-      ];
+      const updated: Msg[] = [...next, { role: "assistant", content: `I hit an error: ${e?.message || e}` }];
       setMsgs(updated);
       saveHistory(updated);
     } finally {
       setThinking(false);
     }
-  }, [draft, thinking, key, msgs]);
+  }, [draft, thinking, key, msgs, person]);
 
   const saveKey = useCallback(async () => {
     await setKey(keyDraft);
@@ -98,20 +142,72 @@ export default function App() {
   const clearHistory = useCallback(() => {
     Alert.alert("Clear chat?", "Wipes the on-device conversation history.", [
       { text: "Cancel", style: "cancel" },
-      {
-        text: "Clear",
-        style: "destructive",
-        onPress: () => {
-          setMsgs([]);
-          saveHistory([]);
-        },
-      },
+      { text: "Clear", style: "destructive", onPress: () => { setMsgs([]); saveHistory([]); } },
     ]);
   }, []);
 
-  const openAIStudio = useCallback(() => {
-    Linking.openURL(AI_STUDIO_URL).catch(() => {});
+  const chooseTheme = useCallback((t: ThemeName) => {
+    setThemeName(t);
+    setTheme(t).catch(() => {});
   }, []);
+
+  const savePerson = useCallback(async () => {
+    const next = { archetype: person.archetype || "neutral", notes: person.notes.slice(0, 800) };
+    setPerson(next);
+    await setPersonality(next);
+  }, [person]);
+
+  const resetPerson = useCallback(async () => {
+    const next = { archetype: "neutral", notes: "" };
+    setPerson(next);
+    await setPersonality(next);
+  }, []);
+
+  const runFilesScan = useCallback(async (kind: "app" | "pick") => {
+    setScanBusy(true);
+    setScanProgress(kind === "app" ? "Scanning app storage…" : "Opening Files picker…");
+    setScanReport(null);
+    try {
+      const report = kind === "app" ? await scanAppStorage(setScanProgress) : await pickAndScan(setScanProgress);
+      setScanReport(report);
+      if (!report) setScanProgress("No files selected.");
+    } catch (e: any) {
+      setScanReport({ scanned: 0, skipped: 0, findings: [], quarantined: 0, errors: [e?.message || String(e)] });
+    } finally {
+      setScanBusy(false);
+      setScanProgress("");
+    }
+  }, []);
+
+  const runGithubScan = useCallback(async () => {
+    if (!githubInput.trim() || githubBusy) return;
+    setGithubBusy(true);
+    setScanProgress("Scanning GitHub repo…");
+    setGithubReport(null);
+    try {
+      setGithubReport(await scanGitHubRepo(githubInput, setScanProgress));
+    } catch (e: any) {
+      setGithubReport({ scanned: 0, skipped: 0, findings: [], quarantined: 0, errors: [e?.message || String(e)] });
+    } finally {
+      setGithubBusy(false);
+      setScanProgress("");
+    }
+  }, [githubInput, githubBusy]);
+
+  const checkBreaches = useCallback(async () => {
+    if (privacyBusy) return;
+    setPrivacyBusy(true);
+    setBreach(null);
+    setBreach(await breachCheck(privacyEmail));
+    setPrivacyBusy(false);
+  }, [privacyEmail, privacyBusy]);
+
+  const cycleBroker = useCallback(async (name: string) => {
+    const next = { ...privacyState };
+    next[name] = nextPrivacyStatus(next[name] || "not_started");
+    setPrivacyStateLocal(next);
+    await setPrivacyState(next);
+  }, [privacyState]);
 
   const renderMsg = ({ item }: { item: Msg }) => (
     <View style={[styles.msg, item.role === "user" ? styles.user : styles.lotus]}>
@@ -120,12 +216,31 @@ export default function App() {
     </View>
   );
 
+  const sevColor = (s: string) => (s === "high" ? "#f87171" : s === "medium" ? "#fbbf24" : "#38bdf8");
+  const renderFinding = (f: Finding, i: number) => (
+    <View key={`${f.path}-${i}`} style={styles.finding}>
+      <Text style={[styles.findingKind, { color: sevColor(f.severity) }]}>{f.severity.toUpperCase()} · {f.kind}</Text>
+      <Text style={styles.findingPath}>{f.path}</Text>
+      <Text style={styles.findingDetail}>{f.detail}</Text>
+    </View>
+  );
+
+  const reportSummary = (r: ScanReport | GithubReport | null) => {
+    if (!r) return null;
+    return (
+      <View style={styles.reportBox}>
+        <Text style={styles.reportText}>
+          scanned {r.scanned} · skipped {r.skipped} · findings {r.findings.length} · quarantined {r.quarantined}
+        </Text>
+        {"repo" in r && r.repo ? <Text style={styles.reportText}>{r.repo}@{r.branch}{r.truncated ? " · tree truncated" : ""}</Text> : null}
+        {r.note ? <Text style={styles.reportText}>{r.note}</Text> : null}
+        {r.errors?.length ? <Text style={styles.reportText}>errors: {r.errors.join("; ")}</Text> : null}
+      </View>
+    );
+  };
+
   const askPanel = (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
-      style={styles.panel}
-    >
+    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0} style={styles.panel}>
       <FlatList
         ref={listRef}
         style={styles.list}
@@ -134,31 +249,12 @@ export default function App() {
         keyExtractor={(_, i) => String(i)}
         renderItem={renderMsg}
         onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
-        ListEmptyComponent={
-          <Text style={styles.empty}>
-            Ask questions about security, code, or your systems.
-          </Text>
-        }
-        ListFooterComponent={
-          thinking ? <Text style={styles.thinking}>Lotus is typing…</Text> : undefined
-        }
+        ListEmptyComponent={<Text style={styles.empty}>Ask questions about security, code, or your systems.</Text>}
+        ListFooterComponent={thinking ? <Text style={styles.thinking}>Lotus is typing…</Text> : undefined}
       />
       <View style={styles.composer}>
-        <TextInput
-          style={styles.composerInput}
-          placeholder="Ask Lotus…"
-          placeholderTextColor="#5b4a86"
-          value={draft}
-          onChangeText={setDraft}
-          multiline
-          editable={!thinking}
-          onSubmitEditing={send}
-        />
-        <Pressable
-          style={[styles.sendBtn, (thinking || !draft.trim()) && { opacity: 0.5 }]}
-          onPress={send}
-          disabled={thinking || !draft.trim()}
-        >
+        <TextInput style={styles.composerInput} placeholder="Ask Lotus…" placeholderTextColor="#5b4a86" value={draft} onChangeText={setDraft} multiline editable={!thinking} onSubmitEditing={send} />
+        <Pressable style={[styles.sendBtn, (thinking || !draft.trim()) && { opacity: 0.5 }]} onPress={send} disabled={thinking || !draft.trim()}>
           <Text style={styles.sendText}>➤</Text>
         </Pressable>
       </View>
@@ -166,61 +262,130 @@ export default function App() {
     </KeyboardAvoidingView>
   );
 
-  const logsPanel = (
-    <View style={styles.panel}>
-      <FlatList
-        style={styles.list}
-        contentContainerStyle={{ padding: 12, paddingBottom: 18 }}
-        data={msgs}
-        keyExtractor={(_, i) => String(i)}
-        renderItem={renderMsg}
-        ListHeaderComponent={
-          <View style={styles.logsHead}>
-            <Text style={styles.section}>Logs / Memory</Text>
-            <Text style={styles.sub}>
-              On-device chat history · {msgs.length} message{msgs.length === 1 ? "" : "s"}
-            </Text>
-            <Pressable style={[styles.btn, styles.btnGhost, styles.logsClear]} onPress={clearHistory}>
-              <Text style={styles.btnGhostText}>Clear history</Text>
+  const filesPanel = (
+    <ScrollView style={styles.panel} contentContainerStyle={styles.pad}>
+      <Text style={styles.section}>Files</Text>
+      <Text style={styles.sub}>Scan app storage or pick files from the Files app. Suspicious app files are quarantined inside Lotus storage.</Text>
+      <View style={styles.chips}>
+        <Pressable style={[styles.btn, scanBusy && { opacity: 0.5 }]} onPress={() => runFilesScan("app")} disabled={scanBusy}>
+          <Text style={styles.btnText}>Scan app storage</Text>
+        </Pressable>
+        <Pressable style={[styles.btn, styles.btnGhost, scanBusy && { opacity: 0.5 }]} onPress={() => runFilesScan("pick")} disabled={scanBusy}>
+          <Text style={styles.btnGhostText}>Pick files to scan</Text>
+        </Pressable>
+      </View>
+      {!!scanProgress && <Text style={styles.progress}>{scanProgress}</Text>}
+      {reportSummary(scanReport)}
+      {(scanReport?.findings || []).slice(0, 80).map(renderFinding)}
+      <Text style={styles.foot}>iOS limits scans to Lotus storage or files you explicitly pick.</Text>
+    </ScrollView>
+  );
+
+  const privacyPanel = (
+    <ScrollView style={styles.panel} contentContainerStyle={styles.pad}>
+      <Text style={styles.section}>Privacy Sweep</Text>
+      <Text style={styles.sub}>Check breach exposure, then track data-broker opt-outs. Statuses stay on this device.</Text>
+      <TextInput style={styles.input} placeholder="you@example.com" placeholderTextColor="#5b4a86" value={privacyEmail} onChangeText={setPrivacyEmail} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" />
+      <Pressable style={[styles.btn, privacyBusy && { opacity: 0.5 }]} onPress={checkBreaches} disabled={privacyBusy}>
+        <Text style={styles.btnText}>{privacyBusy ? "Checking…" : "Check breaches"}</Text>
+      </Pressable>
+      {breach ? (
+        <View style={styles.reportBox}>
+          {"error" in breach ? <Text style={styles.reportText}>error: {breach.error}</Text> : (
+            <>
+              <Text style={styles.reportText}>breaches: {breach.breaches.length} · pastes: {breach.pastes}</Text>
+              {breach.breaches.slice(0, 12).map((b) => <Text key={b} style={styles.reportText}>• {b}</Text>)}
+            </>
+          )}
+        </View>
+      ) : null}
+      <Text style={styles.section}>Data brokers</Text>
+      {BROKERS.map((b) => {
+        const status = privacyState[b.name] || "not_started";
+        return (
+          <View key={b.name} style={styles.brokerRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.brokerName}>{b.name}</Text>
+              <Text style={styles.brokerStatus}>{status.replace("_", " ")}</Text>
+            </View>
+            <Pressable style={styles.statusBtn} onPress={() => cycleBroker(b.name)}>
+              <Text style={styles.statusText}>cycle</Text>
+            </Pressable>
+            <Pressable style={styles.statusBtn} onPress={() => openLink(b.optout)}>
+              <Text style={styles.statusText}>open</Text>
             </Pressable>
           </View>
-        }
-        ListEmptyComponent={<Text style={styles.empty}>No messages yet.</Text>}
-        ListFooterComponent={<Text style={styles.foot}>v{VERSION} · install {iid}</Text>}
-      />
-    </View>
+        );
+      })}
+    </ScrollView>
+  );
+
+  const personalityPanel = (
+    <ScrollView style={styles.panel} contentContainerStyle={styles.pad}>
+      <Text style={styles.section}>Personality</Text>
+      <Text style={styles.sub}>Voice preset for Ask Lotus. Security reports stay literal and professional.</Text>
+      <View style={styles.archRow}>
+        {Object.entries(ARCHETYPES).map(([id, a]) => (
+          <Pressable key={id} style={[styles.archBtn, person.archetype === id && styles.archBtnActive]} onPress={() => setPerson({ ...person, archetype: id })}>
+            <Text style={[styles.archText, person.archetype === id && styles.archTextActive]}>{a.label}</Text>
+          </Pressable>
+        ))}
+      </View>
+      <TextInput style={[styles.input, styles.noteInput]} placeholder="Style notes, e.g. terse, no slang, explain like I'm senior" placeholderTextColor="#5b4a86" value={person.notes} onChangeText={(notes) => setPerson({ ...person, notes })} multiline />
+      <View style={styles.chips}>
+        <Pressable style={styles.btn} onPress={savePerson}><Text style={styles.btnText}>Save personality</Text></Pressable>
+        <Pressable style={[styles.btn, styles.btnGhost]} onPress={resetPerson}><Text style={styles.btnGhostText}>Reset</Text></Pressable>
+      </View>
+    </ScrollView>
+  );
+
+  const patchesPanel = (
+    <ScrollView style={styles.panel} contentContainerStyle={styles.pad}>
+      <Text style={styles.section}>Patch Notes</Text>
+      {PATCH_NOTES.map((r) => (
+        <View key={r.version} style={styles.patchCard}>
+          <Text style={styles.patchVersion}>{r.version}</Text>
+          <Text style={styles.patchDate}>{r.date}</Text>
+          {r.notes.map((n, i) => <Text key={i} style={styles.patchNote}>• {n}</Text>)}
+        </View>
+      ))}
+    </ScrollView>
   );
 
   const settingsPanel = (
     <ScrollView style={styles.panel} contentContainerStyle={styles.settingsScroll}>
       <Text style={styles.section}>Settings</Text>
-      <Text style={styles.sub}>
-        Gemini API key — stored only in this device's secure keychain.
-      </Text>
-      <TextInput
-        style={styles.input}
-        placeholder="AIza…"
-        placeholderTextColor="#5b4a86"
-        value={keyDraft}
-        onChangeText={setKeyDraft}
-        autoCapitalize="none"
-        autoCorrect={false}
-        secureTextEntry
-      />
-      <Pressable style={styles.btn} onPress={saveKey}>
-        <Text style={styles.btnText}>Save key</Text>
+      <Text style={styles.sub}>Gemini API key — stored only in this device's secure keychain.</Text>
+      <TextInput style={styles.input} placeholder="AIza…" placeholderTextColor="#5b4a86" value={keyDraft} onChangeText={setKeyDraft} autoCapitalize="none" autoCorrect={false} secureTextEntry />
+      <Pressable style={styles.btn} onPress={saveKey}><Text style={styles.btnText}>Save key</Text></Pressable>
+      <Pressable style={[styles.btn, styles.btnGhost]} onPress={() => openLink(AI_STUDIO_URL)}><Text style={styles.btnGhostText}>Get a Gemini API key in AI Studio</Text></Pressable>
+
+      <Text style={styles.section}>Theme</Text>
+      <View style={styles.swatches}>
+        {THEME_NAMES.map((t) => (
+          <Pressable key={t} onPress={() => chooseTheme(t)} style={[styles.swatch, { backgroundColor: PALETTES[t].accent }, themeName === t && styles.swatchActive]} />
+        ))}
+      </View>
+
+      <Text style={styles.section}>Support</Text>
+      <View style={styles.chips}>
+        <Pressable style={[styles.btn, styles.btnGhost]} onPress={() => openLink(FEEDBACK_URL)}><Text style={styles.btnGhostText}>Feedback</Text></Pressable>
+        <Pressable style={[styles.btn, styles.btnGhost]} onPress={() => openLink(REPORT_URL)}><Text style={styles.btnGhostText}>Report</Text></Pressable>
+      </View>
+
+      <Text style={styles.section}>GitHub scanner</Text>
+      <Text style={styles.sub}>Read-only public repo scan for secrets and risky code patterns.</Text>
+      <TextInput style={styles.input} placeholder="owner/repo or github.com URL" placeholderTextColor="#5b4a86" value={githubInput} onChangeText={setGithubInput} autoCapitalize="none" autoCorrect={false} />
+      <Pressable style={[styles.btn, (githubBusy || !githubInput.trim()) && { opacity: 0.5 }]} onPress={runGithubScan} disabled={githubBusy || !githubInput.trim()}>
+        <Text style={styles.btnText}>{githubBusy ? "Scanning…" : "Scan repo"}</Text>
       </Pressable>
-      <Pressable style={[styles.btn, styles.btnGhost]} onPress={openAIStudio}>
-        <Text style={styles.btnGhostText}>Get a Gemini API key in AI Studio</Text>
-      </Pressable>
-      <Pressable style={[styles.btn, styles.btnGhost]} onPress={clearHistory}>
-        <Text style={styles.btnGhostText}>Clear chat history</Text>
-      </Pressable>
-      {!!key && (
-        <Pressable style={[styles.btn, styles.btnGhost]} onPress={() => setSection("ask")}>
-          <Text style={styles.btnGhostText}>Back to chat</Text>
-        </Pressable>
-      )}
+      {reportSummary(githubReport)}
+      {(githubReport?.findings || []).slice(0, 40).map(renderFinding)}
+
+      <View style={styles.chips}>
+        <Pressable style={[styles.btn, styles.btnGhost]} onPress={clearHistory}><Text style={styles.btnGhostText}>Clear chat history</Text></Pressable>
+        {!!key && <Pressable style={[styles.btn, styles.btnGhost]} onPress={() => setSection("ask")}><Text style={styles.btnGhostText}>Back to chat</Text></Pressable>}
+      </View>
       <Text style={styles.foot}>v{VERSION} · install {iid}</Text>
     </ScrollView>
   );
@@ -235,28 +400,21 @@ export default function App() {
         </View>
         <Text style={styles.headInstall}>#{iid || "…"}</Text>
       </View>
-
       <View style={styles.body}>
         <View style={styles.rail}>
           {SECTIONS.map((s) => (
-            <Pressable
-              key={s.id}
-              onPress={() => setSection(s.id)}
-              style={[styles.orb, section === s.id && styles.orbActive]}
-            >
-              <Text style={[styles.orbIcon, section === s.id && styles.orbIconActive]}>
-                {s.icon}
-              </Text>
-              <Text style={[styles.orbLabel, section === s.id && styles.orbLabelActive]}>
-                {s.label}
-              </Text>
+            <Pressable key={s.id} onPress={() => setSection(s.id)} style={[styles.orb, section === s.id && styles.orbActive]}>
+              <Text style={[styles.orbIcon, section === s.id && styles.orbIconActive]}>{s.icon}</Text>
+              <Text style={[styles.orbLabel, section === s.id && styles.orbLabelActive]}>{s.label}</Text>
             </Pressable>
           ))}
         </View>
-
         <View style={styles.content}>
           {section === "ask" && askPanel}
-          {section === "logs" && logsPanel}
+          {section === "files" && filesPanel}
+          {section === "privacy" && privacyPanel}
+          {section === "personality" && personalityPanel}
+          {section === "patches" && patchesPanel}
           {section === "settings" && settingsPanel}
         </View>
       </View>
@@ -264,128 +422,70 @@ export default function App() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: C.border,
-    backgroundColor: "rgba(20, 12, 38, 0.9)",
-  },
-  title: { color: C.text, fontWeight: "800", fontSize: 17, letterSpacing: 3 },
-  sub: { color: C.sub, fontSize: 11 },
-  headInstall: { color: C.sub, fontSize: 10 },
-  body: { flex: 1, flexDirection: "row" },
-  rail: {
-    width: 66,
-    alignItems: "center",
-    paddingVertical: 12,
-    borderRightWidth: 1,
-    borderRightColor: C.border,
-    backgroundColor: "rgba(16, 9, 30, 0.9)",
-  },
-  orb: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    alignItems: "center",
-    justifyContent: "center",
-    marginVertical: 7,
-    backgroundColor: C.panel,
-    borderWidth: 1,
-    borderColor: C.border,
-  },
-  orbActive: {
-    borderColor: C.accent,
-    backgroundColor: "rgba(139, 92, 246, 0.24)",
-  },
-  orbIcon: { color: C.sub, fontSize: 18, fontWeight: "800" },
-  orbIconActive: { color: C.accentLight },
-  orbLabel: { color: C.sub, fontSize: 8, marginTop: 2, fontWeight: "700" },
-  orbLabelActive: { color: C.accentLight },
-  content: { flex: 1 },
-  panel: { flex: 1 },
-  list: { flex: 1 },
-  empty: { color: C.sub, textAlign: "center", marginTop: 60, fontSize: 13 },
-  thinking: { color: C.sub, fontStyle: "italic", marginTop: 8 },
-  msg: { marginVertical: 5, padding: 10, borderRadius: 10, maxWidth: "90%" },
-  user: {
-    alignSelf: "flex-end",
-    backgroundColor: "#241243",
-    borderWidth: 1,
-    borderColor: "#55308f",
-  },
-  lotus: {
-    alignSelf: "flex-start",
-    backgroundColor: C.panel,
-    borderWidth: 1,
-    borderColor: C.border,
-  },
-  msgWho: { color: C.accentLight, fontSize: 10, fontWeight: "700", marginBottom: 3 },
-  msgText: { color: C.text, fontSize: 14, lineHeight: 20 },
-  composer: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    padding: 10,
-    borderTopWidth: 1,
-    borderTopColor: C.border,
-    backgroundColor: "rgba(20, 12, 38, 0.95)",
-  },
-  composerInput: {
-    flex: 1,
-    color: C.text,
-    backgroundColor: C.input,
-    borderWidth: 1,
-    borderColor: C.border,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingTop: 10,
-    paddingBottom: 10,
-    maxHeight: 120,
-    fontSize: 14,
-  },
-  sendBtn: {
-    marginLeft: 8,
-    backgroundColor: C.accent,
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 11,
-  },
-  sendText: { color: "#fff", fontSize: 15, fontWeight: "700" },
-  footSmall: { color: C.sub, fontSize: 10, textAlign: "center", paddingBottom: 6 },
-  section: { color: C.accentLight, fontSize: 15, fontWeight: "700", marginBottom: 6 },
-  logsHead: { marginBottom: 12 },
-  logsClear: { alignSelf: "flex-start", marginTop: 8 },
-  settingsScroll: { padding: 18, paddingBottom: 28 },
-  input: {
-    color: C.text,
-    backgroundColor: C.input,
-    borderWidth: 1,
-    borderColor: C.border,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 11,
-    fontSize: 14,
-    marginBottom: 10,
-  },
-  btn: {
-    backgroundColor: C.accent,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  btnText: { color: "#fff", fontWeight: "800", fontSize: 13 },
-  btnGhost: {
-    backgroundColor: "transparent",
-    borderWidth: 1,
-    borderColor: C.border,
-  },
-  btnGhostText: { color: C.text, fontWeight: "700", fontSize: 12 },
-  foot: { color: C.sub, fontSize: 10, marginTop: 18 },
-});
+function createStyles(c: Palette) {
+  return StyleSheet.create({
+    root: { flex: 1, backgroundColor: c.bg },
+    header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: c.border, backgroundColor: "rgba(20, 12, 38, 0.9)" },
+    title: { color: c.text, fontWeight: "800", fontSize: 17, letterSpacing: 3 },
+    sub: { color: c.sub, fontSize: 11, marginBottom: 8 },
+    headInstall: { color: c.sub, fontSize: 10 },
+    body: { flex: 1, flexDirection: "row" },
+    rail: { width: 72, alignItems: "center", paddingVertical: 10, borderRightWidth: 1, borderRightColor: c.border, backgroundColor: "rgba(16, 9, 30, 0.9)" },
+    orb: { width: 48, height: 48, borderRadius: 24, alignItems: "center", justifyContent: "center", marginVertical: 5, backgroundColor: c.panel, borderWidth: 1, borderColor: c.border },
+    orbActive: { borderColor: c.accent, backgroundColor: "rgba(139, 92, 246, 0.24)" },
+    orbIcon: { color: c.sub, fontSize: 16, fontWeight: "800" },
+    orbIconActive: { color: c.accentLight },
+    orbLabel: { color: c.sub, fontSize: 7, marginTop: 1, fontWeight: "700" },
+    orbLabelActive: { color: c.accentLight },
+    content: { flex: 1 },
+    panel: { flex: 1 },
+    pad: { padding: 14, paddingBottom: 24 },
+    settingsScroll: { padding: 18, paddingBottom: 28 },
+    list: { flex: 1 },
+    empty: { color: c.sub, textAlign: "center", marginTop: 60, fontSize: 13 },
+    thinking: { color: c.sub, fontStyle: "italic", marginTop: 8 },
+    msg: { marginVertical: 5, padding: 10, borderRadius: 10, maxWidth: "90%" },
+    user: { alignSelf: "flex-end", backgroundColor: "#241243", borderWidth: 1, borderColor: "#55308f" },
+    lotus: { alignSelf: "flex-start", backgroundColor: c.panel, borderWidth: 1, borderColor: c.border },
+    msgWho: { color: c.accentLight, fontSize: 10, fontWeight: "700", marginBottom: 3 },
+    msgText: { color: c.text, fontSize: 14, lineHeight: 20 },
+    composer: { flexDirection: "row", alignItems: "flex-end", padding: 10, borderTopWidth: 1, borderTopColor: c.border, backgroundColor: "rgba(20, 12, 38, 0.95)" },
+    composerInput: { flex: 1, color: c.text, backgroundColor: c.input, borderWidth: 1, borderColor: c.border, borderRadius: 10, paddingHorizontal: 12, paddingTop: 10, paddingBottom: 10, maxHeight: 120, fontSize: 14 },
+    sendBtn: { marginLeft: 8, backgroundColor: c.accent, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 11 },
+    sendText: { color: "#fff", fontSize: 15, fontWeight: "700" },
+    footSmall: { color: c.sub, fontSize: 10, textAlign: "center", paddingBottom: 6 },
+    foot: { color: c.sub, fontSize: 10, marginTop: 16 },
+    section: { color: c.accentLight, fontSize: 15, fontWeight: "700", marginBottom: 6, marginTop: 8 },
+    input: { color: c.text, backgroundColor: c.input, borderWidth: 1, borderColor: c.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 11, fontSize: 14, marginBottom: 10 },
+    noteInput: { minHeight: 84, textAlignVertical: "top" },
+    btn: { backgroundColor: c.accent, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 11, alignItems: "center", marginBottom: 10 },
+    btnText: { color: "#fff", fontWeight: "800", fontSize: 13 },
+    btnGhost: { backgroundColor: "transparent", borderWidth: 1, borderColor: c.border },
+    btnGhostText: { color: c.text, fontWeight: "700", fontSize: 12 },
+    chips: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 10 },
+    progress: { color: c.sub, fontStyle: "italic", marginBottom: 8 },
+    reportBox: { borderWidth: 1, borderColor: c.border, borderRadius: 10, padding: 10, marginBottom: 10, backgroundColor: c.panel },
+    reportText: { color: c.text, fontSize: 12, marginBottom: 3 },
+    finding: { borderWidth: 1, borderColor: c.border, borderRadius: 8, padding: 8, marginBottom: 7, backgroundColor: c.panel },
+    findingKind: { fontSize: 10, fontWeight: "800", marginBottom: 2 },
+    findingPath: { color: c.text, fontSize: 12, fontWeight: "700" },
+    findingDetail: { color: c.sub, fontSize: 11, marginTop: 2 },
+    brokerRow: { flexDirection: "row", alignItems: "center", borderBottomWidth: 1, borderBottomColor: c.border, paddingVertical: 8 },
+    brokerName: { color: c.text, fontSize: 13, fontWeight: "700" },
+    brokerStatus: { color: c.sub, fontSize: 11, marginTop: 2 },
+    statusBtn: { borderWidth: 1, borderColor: c.border, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 6, marginLeft: 6 },
+    statusText: { color: c.text, fontSize: 10, fontWeight: "800" },
+    archRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 10 },
+    archBtn: { borderWidth: 1, borderColor: c.border, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: c.panel },
+    archBtnActive: { borderColor: c.accent, backgroundColor: "rgba(139, 92, 246, 0.24)" },
+    archText: { color: c.sub, fontSize: 11, fontWeight: "800" },
+    archTextActive: { color: c.accentLight },
+    patchCard: { borderWidth: 1, borderColor: c.border, borderRadius: 10, padding: 12, marginBottom: 10, backgroundColor: c.panel },
+    patchVersion: { color: c.text, fontSize: 14, fontWeight: "800" },
+    patchDate: { color: c.sub, fontSize: 11, marginBottom: 6 },
+    patchNote: { color: c.text, fontSize: 12, lineHeight: 18, marginBottom: 3 },
+    swatches: { flexDirection: "row", gap: 10, marginBottom: 12 },
+    swatch: { width: 34, height: 34, borderRadius: 17, borderWidth: 1, borderColor: c.border },
+    swatchActive: { borderColor: c.text, borderWidth: 3 },
+  });
+}
