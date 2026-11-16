@@ -13,6 +13,12 @@ if [ -z "$UDID" ]; then
 fi
 echo "Installing to device $UDID"
 
+# iOS has its own manifest (ios-manifest.json) — manifests are per-platform and
+# app.json's updates.url points at the Android one. Re-point after any prebuild.
+plutil -replace EXUpdatesURL -string \
+  "https://lotus-updates.web.app/ios-manifest.json" \
+  ios/LotusBeta/Supporting/Expo.plist
+
 BUILD_DIR=/tmp/lotus_ios_build
 xcodebuild -workspace ios/LotusBeta.xcworkspace \
   -scheme LotusBeta -configuration Release \

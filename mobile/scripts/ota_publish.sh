@@ -6,6 +6,10 @@
 # Usage: bash mobile/scripts/ota_publish.sh
 set -euo pipefail
 
+# Prefer a newer local node when present — Expo CLI requires >=22.13 and the
+# system node on the Mac is older. No-op on machines without ~/.local/node22.
+[ -d "$HOME/.local/node22/bin" ] && export PATH="$HOME/.local/node22/bin:$PATH"
+
 cd "$(dirname "$0")/.."
 OUT=dist-ota
 SITE=/tmp/lotus-fb
