@@ -1,0 +1,60 @@
+name: Build Windows beta assets
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to update (for example v0.1.0-beta.71)
+        required: true
+        type: string
+      ref:
+        description: Git ref to build (defaults to main)
+        required: false
+        default: main
+        type: string
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      BUILD_REF: ${{ inputs.ref || github.event.release.tag_name || github.ref }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.BUILD_REF }}
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pyinstaller
+
+      - name: Build Lotus Beta.exe
+        run: pyinstaller --clean --noconfirm scripts/lotus_beta_win.spec
+
+      - name: Build beta zip
+        run: python scripts/build_beta_zip.py
+
+      - name: Stage release assets
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force release-assets | Out-Null
+          Copy-Item dist/Lotus Beta.exe release-assets/Lotus.Beta.exe
+          Copy-Item dist/Lotus Beta.zip release-assets/Lotus.Beta.zip
+
+      - name: Upload Windows assets
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: gh release upload "$env:TAG" release-assets/* --clobber

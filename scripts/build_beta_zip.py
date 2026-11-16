@@ -22,6 +22,7 @@ DIST = ROOT / "dist"
 EXCLUDE_DIRS = {
     ".git", "memory", "config", "dist", ".venv", "venv", "env", "node_modules",
     "__pycache__", "_lotus_update_staging", ".idea", ".vscode",
+    ".pytest_cache", ".expo", "ios", "android",
 }
 EXCLUDE_FILES = {"api_keys.json", "devbox.json", ".env"}
 EXCLUDE_SUFFIXES = {".pyc", ".pyo", ".log"}
