@@ -6,6 +6,13 @@ export type PatchNote = {
 
 export const PATCH_NOTES: PatchNote[] = [
   {
+    version: "0.1.0-beta.16",
+    date: "2026-11-16",
+    notes: [
+      "OTA cellular test build — if this patch note is visible, service-data updates work end to end",
+    ],
+  },
+  {
     version: "0.1.0-beta.15",
     date: "2026-11-16",
     notes: [
