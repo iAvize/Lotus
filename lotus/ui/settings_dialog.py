@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (
     QMessageBox, QPushButton, QVBoxLayout,
 )
 
-from .. import ai, config, crashlog, db, startup
+from .. import ai, config, crashlog, db, report, startup
 from . import theme
 
 
@@ -63,9 +63,15 @@ class SettingsDialog(QDialog):
         self.startup_check.toggled.connect(self._toggle_startup)
         layout.addWidget(self.startup_check)
 
-        report_btn = QPushButton("Copy error report")
-        report_btn.clicked.connect(self._copy_report)
-        layout.addWidget(report_btn)
+        report_row = QHBoxLayout()
+        email_report_btn = QPushButton("Email crash report")
+        email_report_btn.clicked.connect(self._email_report)
+        copy_report_btn = QPushButton("Copy error report")
+        copy_report_btn.clicked.connect(self._copy_report)
+        report_row.addWidget(email_report_btn)
+        report_row.addWidget(copy_report_btn)
+        report_row.addStretch(1)
+        layout.addLayout(report_row)
 
         feedback_btn = QPushButton("Send feedback")
         feedback_btn.clicked.connect(self._send_feedback)
@@ -90,6 +96,10 @@ class SettingsDialog(QDialog):
         self.status.setStyleSheet(f"color: {theme.current()['accent_light']};")
         db.log("info", "settings", f"theme switched to {name}")
 
+    def _email_report(self):
+        QDesktopServices.openUrl(QUrl(report.report_mailto()))
+        self.status.setText("Crash report opened in your mail app — just press Send.")
+
     def _copy_report(self):
         from PyQt6.QtWidgets import QApplication
         QApplication.clipboard().setText(crashlog.build_report())
@@ -98,26 +108,11 @@ class SettingsDialog(QDialog):
             "Error report copied — paste it when reporting a bug to the developers.")
 
     def _send_feedback(self):
-        from urllib.parse import quote
-        try:
-            from ..feedback_email import FEEDBACK_EMAIL as _baked
-        except Exception:
-            _baked = "akaavize@outlook.com"
-        email = db.get_setting("feedback_email", "") or _baked
-        if not email:
+        if not report.feedback_email():
             QMessageBox.information(self, "Feedback",
                                     "Feedback email isn't configured yet.")
             return
-        from .. import __version__, usage
-        import platform
-        subj = quote(f"Lotus Beta feedback (v{__version__})")
-        body = quote(
-            f"Version: {__version__}\nInstall: {usage.install_id()}\n"
-            f"Platform: {platform.system()} {platform.release()}\n\n"
-            "What happened?\n\n"
-            "Screenshot/video: attach before sending (Lotus can't attach files to email).\n\n"
-        )
-        QDesktopServices.openUrl(QUrl(f"mailto:{email}?subject={subj}&body={body}"))
+        QDesktopServices.openUrl(QUrl(report.feedback_mailto()))
 
     def _toggle_startup(self, checked: bool):
         if startup.set_enabled(checked):

@@ -128,9 +128,9 @@ export default function App() {
     return `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(`Lotus Beta feedback (v${VERSION})`)}&body=${encodeURIComponent(body)}`;
   }, [diagnostics]);
 
-  const reportUrl = useCallback(() => {
-    const body = `${diagnostics()}\n\nError/report:\n${lastError || "(paste copied diagnostics here)"}\n\n`;
-    return `https://github.com/iAvize/Lotus/issues/new?title=${encodeURIComponent(`Lotus Beta report (v${VERSION})`)}&body=${encodeURIComponent(body)}`;
+  const reportMailto = useCallback(() => {
+    const body = `${diagnostics()}\n\nError/report:\n${lastError || "(paste copied diagnostics here)"}\n\nNothing else needed — the diagnostics above have what we need.`;
+    return `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(`Lotus Beta crash report (v${VERSION})`)}&body=${encodeURIComponent(body)}`;
   }, [diagnostics, lastError]);
 
   const copyDiagnostics = useCallback(async () => {
@@ -466,11 +466,11 @@ export default function App() {
       <Text style={styles.section}>Support</Text>
       {!!lastError && <Text style={styles.reportText}>last error: {lastError}</Text>}
       <View style={styles.chips}>
+        <Pressable style={[styles.btn, styles.btnGhost]} onPress={() => openLink(reportMailto())}><Text style={styles.btnGhostText}>Report error</Text></Pressable>
         <Pressable style={[styles.btn, styles.btnGhost]} onPress={() => openLink(feedbackMailto())}><Text style={styles.btnGhostText}>Feedback</Text></Pressable>
-        <Pressable style={[styles.btn, styles.btnGhost]} onPress={() => openLink(reportUrl())}><Text style={styles.btnGhostText}>Report</Text></Pressable>
         <Pressable style={[styles.btn, styles.btnGhost]} onPress={copyDiagnostics}><Text style={styles.btnGhostText}>Copy diagnostics</Text></Pressable>
       </View>
-      <Text style={styles.sub}>Feedback opens Mail with version/install ID. Attach screenshots/videos in Mail before sending.</Text>
+      <Text style={styles.sub}>Report error emails a ready-made crash report — no writing needed. Feedback is for detailed notes; screenshots/videos optional, attach in Mail.</Text>
 
       <Text style={styles.section}>GitHub scanner</Text>
       <Text style={styles.sub}>Read-only public repo scan for secrets and risky code patterns.</Text>

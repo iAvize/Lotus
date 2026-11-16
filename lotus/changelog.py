@@ -8,6 +8,16 @@ from __future__ import annotations
 from . import db
 
 RELEASES = [
+    {"version": "0.1.0-beta.68", "date": "2026-11-15",
+     "notes": ["New Report / Feedback section — one-tap crash reports email full diagnostics, no writing needed", "Feedback keeps the detailed path; screenshots/videos stay optional attachments", "Mobile Report button now emails the developer with prefilled diagnostics"]},
+    {"version": "0.1.0-beta.67", "date": "2026-11-16",
+     "notes": ["Faster mobile chat and diagnostic feedback reports", "Feedback email defaults to the developer address"]},
+    {"version": "0.1.0-beta.66", "date": "2026-11-16",
+     "notes": ["Orb glow no longer clipped at the strip edge"]},
+    {"version": "0.1.0-beta.65", "date": "2026-11-16",
+     "notes": ["Privacy Sweep section", "'Available at launch' Pro teasers"]},
+    {"version": "0.1.0-beta.64", "date": "2026-11-16",
+     "notes": ["Project Audit — codebase scan, AI findings, reviewable patches"]},
     {"version": "0.1.0-beta.63", "date": "2026-11-13",
      "notes": ["Real macOS app bundle (Lotus Beta.app) via PyInstaller", "App data lives in ~/Library/Application Support/Lotus when frozen on macOS", "Updater filters release assets by platform"]},
     {"version": "0.1.0-beta.62", "date": "2026-11-13",

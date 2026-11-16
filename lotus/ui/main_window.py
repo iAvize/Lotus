@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
     QFileDialog, QTableWidgetItem, QTabWidget, QTextBrowser, QTextEdit, QVBoxLayout, QWidget,
 )
 
-from .. import __version__, ai, audit, changelog, config, db, devbox, github, personality, platform_info, privacy, scanner, updater, usage
+from .. import __version__, ai, audit, changelog, config, crashlog, db, devbox, github, personality, platform_info, privacy, report, scanner, updater, usage
 from .orbnav import OrbNav
 from .clockbox import ClockBox
 from . import theme
@@ -316,6 +316,7 @@ class MainWindow(QMainWindow):
         self._register_section("privacy", "Privacy Sweep", self._build_privacy_page(), nav_layout)
         self._register_section("personality", "Personality", self._build_personality_page(), nav_layout)
         self._register_section("patchnotes", "Patch Notes", self._build_patchnotes_page(), nav_layout)
+        self._register_section("report", "Report / Feedback", self._build_report_page(), nav_layout)
         nav_layout.addStretch(1)
 
         # --- OLD LEFT-PANEL NAV (kept for revert): layout.addWidget(nav) ---
@@ -982,6 +983,78 @@ class MainWindow(QMainWindow):
         view.setHtml("".join(parts))
         layout.addWidget(view, 1)
         return page
+
+    def _build_report_page(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.addWidget(self._section_label("Report / Feedback"))
+
+        report_lbl = QLabel("Report an error or crash")
+        report_lbl.setObjectName("section")
+        layout.addWidget(report_lbl)
+        report_sub = QLabel(
+            "Nothing to write — the report already carries your version, install ID, "
+            "system info, and the recent error log. Paste an error code or message "
+            "below if you have one, then send.")
+        report_sub.setObjectName("subtitle")
+        report_sub.setWordWrap(True)
+        layout.addWidget(report_sub)
+        self.report_paste = QTextEdit()
+        self.report_paste.setPlaceholderText("Paste an error code or crash text here (optional)")
+        self.report_paste.setMaximumHeight(90)
+        layout.addWidget(self.report_paste)
+        report_row = QHBoxLayout()
+        email_report = QPushButton("Email crash report")
+        email_report.clicked.connect(self._email_crash_report)
+        copy_report = QPushButton("Copy report")
+        copy_report.clicked.connect(self._copy_crash_report)
+        report_row.addWidget(email_report)
+        report_row.addWidget(copy_report)
+        report_row.addStretch(1)
+        layout.addLayout(report_row)
+
+        feedback_lbl = QLabel("Send feedback")
+        feedback_lbl.setObjectName("section")
+        layout.addWidget(feedback_lbl)
+        feedback_sub = QLabel(
+            "For detailed feedback — ideas, bugs with steps, suggestions. "
+            "Screenshots and videos are optional: attach them in your mail app "
+            "before sending.")
+        feedback_sub.setObjectName("subtitle")
+        feedback_sub.setWordWrap(True)
+        layout.addWidget(feedback_sub)
+        self.feedback_text = QTextEdit()
+        self.feedback_text.setPlaceholderText("What's on your mind? (optional — you can also send a blank ping)")
+        self.feedback_text.setMinimumHeight(110)
+        layout.addWidget(self.feedback_text, 1)
+        feedback_row = QHBoxLayout()
+        email_feedback = QPushButton("Email feedback")
+        email_feedback.clicked.connect(self._email_feedback)
+        feedback_row.addWidget(email_feedback)
+        feedback_row.addStretch(1)
+        layout.addLayout(feedback_row)
+
+        self.report_status = QLabel("")
+        self.report_status.setObjectName("subtitle")
+        layout.addWidget(self.report_status)
+        return page
+
+    def _email_crash_report(self):
+        QDesktopServices.openUrl(QUrl(report.report_mailto(self.report_paste.toPlainText())))
+        self.report_status.setText(
+            "Report opened in your mail app — just press Send. "
+            "(No mail app? Use 'Copy report' and paste it anywhere.)")
+        db.log("info", "report", "crash report emailed (mailto)")
+
+    def _copy_crash_report(self):
+        QApplication.clipboard().setText(crashlog.build_report())
+        self.report_status.setText("Report copied — paste it into an email, chat, or GitHub issue.")
+
+    def _email_feedback(self):
+        QDesktopServices.openUrl(QUrl(report.feedback_mailto(self.feedback_text.toPlainText())))
+        self.report_status.setText(
+            "Feedback opened in your mail app — attach screenshots/videos if you want, then Send.")
+        db.log("info", "report", "feedback emailed (mailto)")
 
     def _maybe_show_patchnotes(self):
         entry = changelog.unseen()
