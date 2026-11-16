@@ -22,6 +22,10 @@ npx expo export --platform "$PLATFORM" --output-dir "$OUT" >/dev/null
 
 mkdir -p "$SITE/public"
 cp "$(dirname "$0")/firebase.json" "$SITE/firebase.json"
+# Clear this platform's stale bundles first: exports land alongside old ones
+# otherwise, and the manifest generator could point at a previous .hbc file.
+# Only this platform's dir — the other platform's live bundle must stay.
+rm -rf "$SITE/public/_expo/static/js/$PLATFORM"
 cp -R "$OUT/_expo" "$SITE/public/"
 
 # Generate the expo-updates protocol manifest for this bundle.
