@@ -91,3 +91,34 @@ Android notes:
 - Hardware back returns to **Ask** first; from Ask it exits.
 - `expo run:android` needs a local JDK + Android SDK (Android Studio
   install covers both) — EAS is the zero-setup path.
+
+## OTA updates (Firebase Hosting, no Expo account)
+
+JS/TS changes ship over-the-air via `expo-updates` pointed at Firebase
+Hosting — **GitHub Pages does not work**: the client rejects manifests
+without an `expo-protocol-version: 1` response header, which Pages can't
+emit. firebase.json (committed at `scripts/firebase.json`) adds it.
+
+- Host: `https://lotus-updates.web.app` (Firebase project `lotus-updates`)
+- Manifests are **per-platform**: `manifest.json` = Android,
+  `ios-manifest.json` = iOS. iOS's `Expo.plist` is re-pointed at the iOS
+  manifest by `rebuild_ios.sh` after any prebuild.
+- Publish (either machine, after `firebase login` once):
+  `bash mobile/scripts/ota_publish.sh [android|ios]` — exports the bundle,
+  regenerates the manifest with a unique launchAsset key (stale-cache fix),
+  clears that platform's stale bundles, deploys.
+- Version discipline: bump `VERSION` in `App.tsx` + `patchNotes.ts` for
+  OTA. `app.json → version` is the runtimeVersion key — bump ONLY with a
+  native rebuild or the update is rejected as incompatible.
+- Cellular/service data: verified working (beta.17 canary). The native
+  launch check applies updates before JS boots (no banner); mid-session
+  fetches show the restart banner once per update id. The JS check retries
+  with backoff and re-runs on foreground. `fallbackToCacheTimeout: 10000`
+  is set in app.json — takes effect on the next native builds.
+- Native/module/permission/app.json changes need a native rebuild:
+  `rebuild_ios.sh` (device connected) or the Android equivalent — OTA only
+  carries JS.
+- macOS tooling: pod install needs the conda Ruby (`~/.local/ruby-env/bin`
+  on PATH) — system Ruby 2.6 can't install CocoaPods. Node 22 lives at
+  `~/.local/node22` (system node is too old for Expo CLI); ota_publish.sh
+  prefers it automatically.
