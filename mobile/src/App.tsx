@@ -53,7 +53,7 @@ import {
 } from "./store";
 import { PALETTES, Palette, THEME_NAMES, ThemeName } from "./theme";
 
-const VERSION = "0.1.0-beta.9";
+const VERSION = "0.1.0-beta.10";
 const AI_STUDIO_URL = "https://aistudio.google.com/apikey";
 const SUPPORT_EMAIL = "bizwithavize@outlook.com";
 const REPORT_ENDPOINT = `https://formsubmit.co/ajax/${SUPPORT_EMAIL}`;
@@ -127,7 +127,11 @@ export default function App() {
           const check = await Updates.checkForUpdateAsync();
           if (check.isAvailable) {
             const fetched = await Updates.fetchUpdateAsync();
-            if (fetched.isNew) setUpdateReady(true);
+            // After restart the check still reports the update we're already
+            // running — only prompt when it's genuinely a different update.
+            if (fetched.isNew && fetched.manifest?.id !== Updates.updateId) {
+              setUpdateReady(true);
+            }
           }
         } catch {}
       })();

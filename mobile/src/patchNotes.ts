@@ -6,6 +6,13 @@ export type PatchNote = {
 
 export const PATCH_NOTES: PatchNote[] = [
   {
+    version: "0.1.0-beta.10",
+    date: "2026-11-16",
+    notes: [
+      "Update banner no longer sticks after applying — the app now recognises when it's already running the fetched update",
+    ],
+  },
+  {
     version: "0.1.0-beta.9",
     date: "2026-11-16",
     notes: [
