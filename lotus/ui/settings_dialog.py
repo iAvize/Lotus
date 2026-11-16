@@ -1,7 +1,7 @@
 """Settings dialog for Lotus secrets, appearance, and integrations."""
 from __future__ import annotations
 
-from PyQt6.QtCore import QUrl
+from PyQt6.QtCore import QTimer, QUrl
 from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtWidgets import (
     QCheckBox, QDialog, QDialogButtonBox, QHBoxLayout, QLabel, QLineEdit,
@@ -64,7 +64,7 @@ class SettingsDialog(QDialog):
         layout.addWidget(self.startup_check)
 
         report_row = QHBoxLayout()
-        email_report_btn = QPushButton("Email crash report")
+        email_report_btn = QPushButton("Send crash report")
         email_report_btn.clicked.connect(self._email_report)
         copy_report_btn = QPushButton("Copy error report")
         copy_report_btn.clicked.connect(self._copy_report)
@@ -97,8 +97,21 @@ class SettingsDialog(QDialog):
         db.log("info", "settings", f"theme switched to {name}")
 
     def _email_report(self):
-        QDesktopServices.openUrl(QUrl(report.report_mailto()))
-        self.status.setText("Crash report opened in your mail app — just press Send.")
+        self.status.setText("Sending crash report…")
+
+        def work():
+            QTimer.singleShot(0, lambda: self._report_done(report.send_report()))
+
+        import threading
+        threading.Thread(target=work, daemon=True).start()
+
+    def _report_done(self, ok: bool):
+        if ok:
+            self.status.setText("Sent — the developer will review it as soon as possible.")
+        else:
+            QDesktopServices.openUrl(QUrl(report.report_mailto()))
+            self.status.setText(
+                "Couldn't send directly — opened your mail app instead, just press Send.")
 
     def _copy_report(self):
         from PyQt6.QtWidgets import QApplication

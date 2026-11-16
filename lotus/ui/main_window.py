@@ -1004,8 +1004,8 @@ class MainWindow(QMainWindow):
         self.report_paste.setMaximumHeight(90)
         layout.addWidget(self.report_paste)
         report_row = QHBoxLayout()
-        email_report = QPushButton("Email crash report")
-        email_report.clicked.connect(self._email_crash_report)
+        email_report = QPushButton("Send crash report")
+        email_report.clicked.connect(self._send_crash_report)
         copy_report = QPushButton("Copy report")
         copy_report.clicked.connect(self._copy_crash_report)
         report_row.addWidget(email_report)
@@ -1039,12 +1039,28 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.report_status)
         return page
 
-    def _email_crash_report(self):
+    def _send_crash_report(self):
+        self.report_status.setText("Sending report…")
+        self._run_bg(
+            lambda: report.send_report(self.report_paste.toPlainText()),
+            on_ok=self._crash_report_sent,
+            on_err=lambda exc: self._crash_report_failed(exc),
+        )
+        db.log("info", "report", "crash report submitted")
+
+    def _crash_report_sent(self, ok: bool):
+        if ok:
+            self.report_status.setText(
+                "Sent — the developer will review it as soon as possible.")
+            self.report_paste.clear()
+        else:
+            self._crash_report_failed("relay unavailable")
+
+    def _crash_report_failed(self, _exc):
         QDesktopServices.openUrl(QUrl(report.report_mailto(self.report_paste.toPlainText())))
         self.report_status.setText(
-            "Report opened in your mail app — just press Send. "
-            "(No mail app? Use 'Copy report' and paste it anywhere.)")
-        db.log("info", "report", "crash report emailed (mailto)")
+            "Couldn't send directly — opened your mail app instead, just press Send. "
+            "(Or use 'Copy report'.)")
 
     def _copy_crash_report(self):
         QApplication.clipboard().setText(crashlog.build_report())

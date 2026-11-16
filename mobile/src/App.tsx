@@ -53,6 +53,7 @@ import { PALETTES, Palette, THEME_NAMES, ThemeName } from "./theme";
 const VERSION = "0.1.0-beta.5";
 const AI_STUDIO_URL = "https://aistudio.google.com/apikey";
 const SUPPORT_EMAIL = "bizwithavize@outlook.com";
+const REPORT_ENDPOINT = `https://formsubmit.co/ajax/${SUPPORT_EMAIL}`;
 
 type Section = "ask" | "files" | "privacy" | "personality" | "patches" | "settings";
 type GithubReport = ScanReport & { repo?: string; branch?: string; truncated?: boolean };
@@ -91,6 +92,10 @@ export default function App() {
   const [breach, setBreach] = useState<BreachResult>(null);
   const [privacyBusy, setPrivacyBusy] = useState(false);
   const [lastError, setLastError] = useState("");
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportDraft, setReportDraft] = useState("");
+  const [reportBusy, setReportBusy] = useState(false);
+  const [reportStatus, setReportStatus] = useState("");
   const listRef = useRef<FlatList>(null);
 
   const C = PALETTES[themeName] || PALETTES.purple;
@@ -128,10 +133,40 @@ export default function App() {
     return `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(`Lotus Beta feedback (v${VERSION})`)}&body=${encodeURIComponent(body)}`;
   }, [diagnostics]);
 
-  const reportMailto = useCallback(() => {
-    const body = `${diagnostics()}\n\nError/report:\n${lastError || "(paste copied diagnostics here)"}\n\nNothing else needed — the diagnostics above have what we need.`;
-    return `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(`Lotus Beta crash report (v${VERSION})`)}&body=${encodeURIComponent(body)}`;
-  }, [diagnostics, lastError]);
+  const sendReport = useCallback(async () => {
+    if (reportBusy) return;
+    setReportBusy(true);
+    setReportStatus("Sending…");
+    const body = `${diagnostics()}\n\n---- pasted error/crash report ----\n${reportDraft.trim() || "(none pasted)"}`;
+    try {
+      const res = await fetch(REPORT_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          Origin: "https://github.com",
+          Referer: "https://github.com/iAvize/Lotus",
+        },
+        body: JSON.stringify({
+          _subject: `Lotus Beta crash report (v${VERSION})`,
+          _captcha: "false",
+          message: body,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && String(data.success) === "true") {
+        setReportStatus("Sent — the developer will review it as soon as possible.");
+        setReportDraft("");
+        setReportOpen(false);
+      } else {
+        setReportStatus("Couldn't send — try again, or use Copy diagnostics and email it via Feedback.");
+      }
+    } catch {
+      setReportStatus("Couldn't send — check your connection, or use Copy diagnostics and email it via Feedback.");
+    } finally {
+      setReportBusy(false);
+    }
+  }, [reportBusy, reportDraft, diagnostics]);
 
   const copyDiagnostics = useCallback(async () => {
     try {
@@ -466,11 +501,32 @@ export default function App() {
       <Text style={styles.section}>Support</Text>
       {!!lastError && <Text style={styles.reportText}>last error: {lastError}</Text>}
       <View style={styles.chips}>
-        <Pressable style={[styles.btn, styles.btnGhost]} onPress={() => openLink(reportMailto())}><Text style={styles.btnGhostText}>Report error</Text></Pressable>
+        <Pressable style={[styles.btn, styles.btnGhost]} onPress={() => setReportOpen(!reportOpen)}><Text style={styles.btnGhostText}>Report error</Text></Pressable>
         <Pressable style={[styles.btn, styles.btnGhost]} onPress={() => openLink(feedbackMailto())}><Text style={styles.btnGhostText}>Feedback</Text></Pressable>
         <Pressable style={[styles.btn, styles.btnGhost]} onPress={copyDiagnostics}><Text style={styles.btnGhostText}>Copy diagnostics</Text></Pressable>
       </View>
-      <Text style={styles.sub}>Report error emails a ready-made crash report — no writing needed. Feedback is for detailed notes; screenshots/videos optional, attach in Mail.</Text>
+      {reportOpen && (
+        <View>
+          <TextInput
+            style={[styles.input, { minHeight: 90, textAlignVertical: "top" }]}
+            placeholder="Paste the error code or crash report here"
+            placeholderTextColor="#5b4a86"
+            value={reportDraft}
+            onChangeText={setReportDraft}
+            multiline
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          <View style={styles.chips}>
+            <Pressable style={[styles.btn, reportBusy && { opacity: 0.5 }]} onPress={sendReport} disabled={reportBusy}>
+              <Text style={styles.btnText}>{reportBusy ? "Sending…" : "Send report"}</Text>
+            </Pressable>
+            <Pressable style={[styles.btn, styles.btnGhost]} onPress={() => setReportOpen(false)}><Text style={styles.btnGhostText}>Cancel</Text></Pressable>
+          </View>
+        </View>
+      )}
+      {!!reportStatus && <Text style={styles.sub}>{reportStatus}</Text>}
+      <Text style={styles.sub}>Report error sends straight to the developer — paste the error and tap Send, done in seconds. Feedback is for detailed notes; it opens Mail so you can attach screenshots/videos (optional).</Text>
 
       <Text style={styles.section}>GitHub scanner</Text>
       <Text style={styles.sub}>Read-only public repo scan for secrets and risky code patterns.</Text>
