@@ -46,7 +46,7 @@
       "policy": "appVersion"
     },
     "updates": {
-      "url": "https://iavize.github.io/Lotus/",
+      "url": "https://iavize.github.io/Lotus/manifest.json",
       "checkAutomatically": "ON_LOAD",
       "fallbackToCacheTimeout": 0
     },
