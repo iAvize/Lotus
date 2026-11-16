@@ -1,0 +1,16 @@
+{
+  "hosting": {
+    "public": "public",
+    "cleanUrls": false,
+    "headers": [
+      {
+        "source": "/**",
+        "headers": [
+          { "key": "expo-protocol-version", "value": "1" },
+          { "key": "expo-sfv-version", "value": "0" },
+          { "key": "Cache-Control", "value": "no-cache" }
+        ]
+      }
+    ]
+  }
+}

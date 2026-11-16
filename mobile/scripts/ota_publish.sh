@@ -21,6 +21,7 @@ echo "Exporting $PLATFORM bundle..."
 npx expo export --platform "$PLATFORM" --output-dir "$OUT" >/dev/null
 
 mkdir -p "$SITE/public"
+cp "$(dirname "$0")/firebase.json" "$SITE/firebase.json"
 cp -R "$OUT/_expo" "$SITE/public/"
 
 # Generate the expo-updates protocol manifest for this bundle.
