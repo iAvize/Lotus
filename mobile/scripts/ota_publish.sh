@@ -20,6 +20,9 @@ mkdir -p "$SITE/public"
 cp -R "$OUT/_expo" "$SITE/public/"
 
 # Generate the expo-updates protocol manifest for this bundle.
+# launchAsset.key MUST be unique per bundle: the Android client stores assets as
+# <key>.hbc in .expo-internal and skips files that already exist. A constant
+# "bundle" key makes every update silently reuse the stale first-ever copy.
 python3 - << PYEOF
 import base64, hashlib, json, os, uuid
 from datetime import datetime, timezone
@@ -31,13 +34,14 @@ for root, _, files in os.walk("_expo/static/js/$PLATFORM"):
             bundle = os.path.join(root, f).replace(os.sep, "/")
 assert bundle, "no $PLATFORM bundle exported"
 digest = base64.urlsafe_b64encode(hashlib.sha256(open(bundle, "rb").read()).digest()).decode().rstrip("=")
+key = "bundle-" + digest[:10].replace("-", "x").replace("_", "y")
 m = {"id": str(uuid.uuid4()), "createdAt": (lambda n: n.strftime("%Y-%m-%dT%H:%M:%S.") + f"{n.microsecond // 1000:03d}Z")(datetime.now(timezone.utc)),
      "runtimeVersion": json.load(open("$(pwd)/$OUT/../app.json"))["expo"]["version"],
-     "launchAsset": {"key": "bundle", "contentType": "application/javascript",
+     "launchAsset": {"key": key, "contentType": "application/javascript",
                      "url": "$BASE_URL/" + bundle, "hash": digest},
      "assets": [], "metadata": {}, "extra": {}}
 json.dump(m, open("$MANIFEST", "w"))
-print("wrote $MANIFEST ->", bundle)
+print("wrote $MANIFEST ->", bundle, "key", key)
 PYEOF
 
 cd "$SITE" && npx firebase-tools deploy --only hosting --project lotus-updates

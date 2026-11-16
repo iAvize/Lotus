@@ -54,7 +54,7 @@ import {
 } from "./store";
 import { PALETTES, Palette, THEME_NAMES, ThemeName } from "./theme";
 
-const VERSION = "0.1.0-beta.12";
+const VERSION = "0.1.0-beta.14";
 const AI_STUDIO_URL = "https://aistudio.google.com/apikey";
 const SUPPORT_EMAIL = "bizwithavize@outlook.com";
 const REPORT_ENDPOINT = `https://formsubmit.co/ajax/${SUPPORT_EMAIL}`;
@@ -139,14 +139,13 @@ export default function App() {
             const fetched = await Updates.fetchUpdateAsync();
             const fetchedId = (fetched.isNew && fetched.manifest?.id) || "";
             const seenId = (await AsyncStorage.getItem("lotus:seen_update")) || "";
-            if (fetchedId && fetchedId !== seenId) {
+            // Offer the restart banner once per update id. Native launch-wait
+            // applies it on the next cold start regardless, so never re-prompt —
+            // that prevents banner loops if a restart lands on embedded again.
+            if (fetched.isNew && fetchedId && fetchedId !== seenId) {
               await AsyncStorage.setItem("lotus:seen_update", fetchedId);
+              setUpdateReady(true);
             }
-            // The check can keep reporting the update we're already running —
-            // suppress it once we've seen this id while on a downloaded bundle.
-            const alreadyRunning =
-              !Updates.isEmbeddedLaunch && fetchedId !== "" && fetchedId === seenId;
-            if (fetched.isNew && fetchedId && !alreadyRunning) setUpdateReady(true);
           }
         } catch {}
       })();

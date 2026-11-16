@@ -48,7 +48,10 @@
     "updates": {
       "url": "https://lotus-updates.web.app/manifest.json",
       "checkAutomatically": "ON_LOAD",
-      "fallbackToCacheTimeout": 0
+      "fallbackToCacheTimeout": 3000,
+      "requestHeaders": {
+        "expo-channel-name": "beta"
+      }
     },
     "plugins": [
       "expo-secure-store",

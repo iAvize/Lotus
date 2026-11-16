@@ -6,6 +6,21 @@ export type PatchNote = {
 
 export const PATCH_NOTES: PatchNote[] = [
   {
+    version: "0.1.0-beta.14",
+    date: "2026-11-16",
+    notes: [
+      "OTA self-repair: update bundles now download under unique filenames, so a stale cached file can no longer shadow new code",
+    ],
+  },
+  {
+    version: "0.1.0-beta.13",
+    date: "2026-11-16",
+    notes: [
+      "Updates now apply automatically on launch — no banner tap needed. Open the app and new versions are simply there",
+      "Fixed the root cause of updates never applying: the app used to launch before the update check finished, leaving downloads stranded",
+    ],
+  },
+  {
     version: "0.1.0-beta.12",
     date: "2026-11-16",
     notes: [

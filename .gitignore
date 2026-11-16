@@ -44,3 +44,4 @@ mobile/android/
 mobile/ios/
 mobile/dist-pages/
 mobile/dist-ios-tmp/
+.github/workflows/android-apk.yml
