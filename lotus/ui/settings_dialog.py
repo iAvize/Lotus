@@ -102,7 +102,7 @@ class SettingsDialog(QDialog):
         try:
             from ..feedback_email import FEEDBACK_EMAIL as _baked
         except Exception:
-            _baked = ""
+            _baked = "akaavize@outlook.com"
         email = db.get_setting("feedback_email", "") or _baked
         if not email:
             QMessageBox.information(self, "Feedback",
