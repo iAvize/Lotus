@@ -48,7 +48,7 @@ Herdr SOC's `Lotus-Workbench`. It is where Lotus experiments on itself:
 7. Releases are Windows zips built by `python scripts/build_beta_zip.py`; on macOS the same script (`--mac`) builds the `Lotus Beta Mac.zip` and `Lotus Beta.dmg` installer.
 8. After any change, keep all copies in sync and report where updates landed:
    `Lotus Source` (Windows: `C:\Users\akaAv\Lotus Source`; macOS:
-   `~/Downloads/Lotus Source`), `C:\Users\akaAv\Lotus Beta`, the rebuilt
+   `~/Lotus Source`), `C:\Users\akaAv\Lotus Beta`, the rebuilt
    `Lotus Beta.exe` (PyInstaller spec in the Beta folder), the `iAvize/Lotus`
    repo, and the GitHub release (tag = version.json). Tell the user which of
    these updated.

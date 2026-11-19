@@ -7,7 +7,7 @@ Use this for your own iPhone only. The app expires about every 7 days and needs 
 One-command rebuild after pulling mobile changes:
 
 ```bash
-cd ~/Downloads/Lotus\ Source/mobile
+cd ~/Lotus\ Source/mobile
 ./scripts/rebuild-ios.sh 00008130-000A045E21C1001C
 ```
 
